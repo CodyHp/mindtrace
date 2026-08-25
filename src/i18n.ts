@@ -110,8 +110,7 @@ const messages: Record<Locale, Record<string, string>> = {
     languageDesc: "界面显示语言。",
     openDashboard: "打开 ObsTracker 看板",
     openDashboardCmd: "打开看板",
-    dashboardHeading: "ObsTracker 看板",
-    dashboardHint: "此看板由 ObsTracker 自动维护，数据实时来自本地 `.obstracker/` 目录。本笔记可正常编辑、版本管理，也能被 Dataview 等其它插件读取。",
+    aboutData: "数据存放于 vault 根的 `.obstracker/` 目录，纯本地、不上传。",
   },
   en: {
     loading: "Loading…",
@@ -222,8 +221,7 @@ const messages: Record<Locale, Record<string, string>> = {
     languageDesc: "Interface display language.",
     openDashboard: "Open ObsTracker dashboard",
     openDashboardCmd: "Open dashboard",
-    dashboardHeading: "ObsTracker Dashboard",
-    dashboardHint: "Maintained by ObsTracker. Data comes live from the local `.obstracker/` directory. This note is editable, version-controllable, and readable by other plugins like Dataview.",
+    aboutData: "Data lives in the `.obstracker/` folder at your vault root — fully local, never uploaded.",
   },
 };
 

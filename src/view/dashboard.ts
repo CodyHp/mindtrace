@@ -71,14 +71,27 @@ function mixHex(a: string, b: string, t: number): string {
 // ---------- 图表实例管理 ----------
 type Chart = ReturnType<typeof echarts.init>;
 let activeCharts: Chart[] = [];
+let resizeObservers: ResizeObserver[] = [];
 
 function initChart(el: HTMLElement): Chart {
   const chart = echarts.init(el);
   activeCharts.push(chart);
+  // 容器尺寸变化时自动 resize；加 isDisposed 检查，避免销毁后 resize 的竞态
+  const ro = new ResizeObserver(() => {
+    try {
+      if (!chart.isDisposed()) chart.resize();
+    } catch {
+      // 忽略销毁/过渡期间的 resize 异常
+    }
+  });
+  ro.observe(el);
+  resizeObservers.push(ro);
   return chart;
 }
 
 function disposeCharts(): void {
+  for (const ro of resizeObservers) ro.disconnect();
+  resizeObservers = [];
   for (const c of activeCharts) c.dispose();
   activeCharts = [];
 }
@@ -192,8 +205,16 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
   el.empty();
   el.addClass("obstracker-report");
 
-  renderKpis(el, report);
-  renderToday(el, report);
+  const safe = (fn: () => void): void => {
+    try {
+      fn();
+    } catch (e) {
+      console.error("ObsTracker render failed:", e);
+    }
+  };
+
+  safe(() => renderKpis(el, report));
+  safe(() => renderToday(el, report));
 
   if (report.totalSeconds === 0) {
     const box = card(el, t("startRecording"));
@@ -201,19 +222,19 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
     return;
   }
 
-  renderMatrix(el, report);
-  renderFolderBars(el, report.folderTree);
-  renderWritePeak(el, report);
-  renderCalendar(el, report);
-  renderDocActivity(el, report);
-  renderWeekCompare(el, report);
-  renderWeekday(el, report);
-  renderFlow(el, report);
-  renderDocGrowth(el, report);
-  renderReadWrite(el, report);
-  renderWordTrend(el, report);
-  renderDocs(el, report, openFile);
-  renderTimeline(el, report);
+  safe(() => renderMatrix(el, report));
+  safe(() => renderFolderBars(el, report.folderTree));
+  safe(() => renderWritePeak(el, report));
+  safe(() => renderCalendar(el, report));
+  safe(() => renderDocActivity(el, report));
+  safe(() => renderWeekCompare(el, report));
+  safe(() => renderWeekday(el, report));
+  safe(() => renderFlow(el, report));
+  safe(() => renderDocGrowth(el, report));
+  safe(() => renderReadWrite(el, report));
+  safe(() => renderWordTrend(el, report));
+  safe(() => renderDocs(el, report, openFile));
+  safe(() => renderTimeline(el, report));
 }
 
 function renderKpis(el: HTMLElement, report: Report): void {

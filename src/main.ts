@@ -10,13 +10,7 @@ import { ObsTrackerSettings } from "./types";
 import { renderReport, setColorTheme as applyColorTheme } from "./view/dashboard";
 
 function dashboardTemplate(): string {
-  return `# ${t("dashboardHeading")}
-
-\`\`\`obstracker
-\`\`\`
-
-> ${t("dashboardHint")}
-`;
+  return "\n```obstracker\n```\n";
 }
 
 export default class ObsTrackerPlugin extends Plugin {
@@ -113,6 +107,10 @@ export default class ObsTrackerPlugin extends Plugin {
       const report = buildReport(events, this.settings);
       loading.remove();
       el.empty();
+      // 等两帧，确保代码块容器完成布局，ECharts 才能拿到正确尺寸
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
+      });
       renderReport(el, report, (path) => {
         void this.app.workspace.openLinkText(path, "", false);
       });

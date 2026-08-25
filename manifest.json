@@ -5,6 +5,6 @@
   "minAppVersion": "1.7.2",
   "description": "Local-first attention analytics: automatically track time spent and writing on each note, then visualize how your attention flows across topics and hours.",
   "author": "yinxuhao",
-  "authorUrl": "",
+  "authorUrl": "https://github.com/CodyHp",
   "isDesktopOnly": false
 }

@@ -30,10 +30,10 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
       .setDesc(t("dashboardPathDesc"))
       .addText((text) =>
         text
-          .setPlaceholder("ObsTracker 看板.md")
+          .setPlaceholder("ObsTracker.md")
           .setValue(this.plugin.settings.dashboardPath)
           .onChange(async (value) => {
-            this.plugin.settings.dashboardPath = value.trim() || "ObsTracker 看板.md";
+            this.plugin.settings.dashboardPath = value.trim() || "ObsTracker.md";
             await this.plugin.saveSettings();
           }),
       );
@@ -113,6 +113,8 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+
+    containerEl.createEl("div", { cls: "obstracker-about", text: t("aboutData") });
   }
 
   private addNumber(

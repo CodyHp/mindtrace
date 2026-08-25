@@ -8,6 +8,14 @@
   color: var(--text-muted);
 }
 
+.obstracker-about {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
+
 .obstracker-empty {
   color: var(--text-muted);
   font-size: 0.9em;

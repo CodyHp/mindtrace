@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: ObsTrackerSettings = {
   sliceSec: 300,
   writeCharThreshold: 20,
   excludePaths: [".obstracker", ".obsidian"],
-  dashboardPath: "ObsTracker 看板.md",
+  dashboardPath: "ObsTracker.md",
   colorTheme: "theme",
   language: "zh-CN",
 };
