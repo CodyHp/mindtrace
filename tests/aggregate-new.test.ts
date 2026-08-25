@@ -92,4 +92,24 @@ describe("buildReport 新增指标", () => {
     const link = r.flow.find((f) => f.source === "哲学" && f.target === "计算机");
     expect(link?.value).toBe(1);
   });
+
+  it("activeSegments：多段活跃不被压缩到连续区间", () => {
+    const ts1 = new Date(2026, 0, 5, 9, 0, 0).getTime();
+    const ts2 = new Date(2026, 0, 5, 11, 0, 0).getTime();
+    const s = makeSession({
+      ts: ts1,
+      activeSeconds: 3000, // 共 50 分钟
+      activeSegments: [
+        [ts1, ts1 + 30 * 60 * 1000], // 9:00 - 9:30
+        [ts2, ts2 + 20 * 60 * 1000], // 11:00 - 11:20
+      ],
+    });
+    const r = buildReport([s], settings);
+    const hour9 = r.matrix.find((c) => c.hour === 9);
+    const hour10 = r.matrix.find((c) => c.hour === 10);
+    const hour11 = r.matrix.find((c) => c.hour === 11);
+    expect(hour9?.seconds).toBeCloseTo(1800);
+    expect(hour10?.seconds).toBeUndefined(); // 中间 blur 断档不计入
+    expect(hour11?.seconds).toBeCloseTo(1200);
+  });
 });

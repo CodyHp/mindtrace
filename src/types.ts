@@ -20,6 +20,8 @@ export interface SessionEvent {
   /** session 开始时文档总字数快照 */
   totalChars: number;
   totalWords: number;
+  /** 活跃段区间（epoch ms 起止对）；缺省时回退为 [ts, ts + activeSeconds*1000] */
+  activeSegments?: [number, number][];
 }
 
 /** edit 事件：编辑增量 */

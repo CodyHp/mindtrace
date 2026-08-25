@@ -165,8 +165,9 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     const levels = folderLevels(s.notePath);
     const folders = levels.length > 0 ? levels : [UNCATEGORIZED];
     const top = levels.length > 0 ? levels[0] : UNCATEGORIZED;
+    const segs = sessionSegments(s);
     const sessionEdits = (editsByPath.get(s.notePath) ?? []).filter(
-      (e) => e.ts >= s.ts && e.ts < s.ts + s.activeSeconds * 1000,
+      (e) => segmentContains(segs, e.ts),
     );
     const { readSeconds, writeSeconds } = classifyReadWrite(
       s,
@@ -180,7 +181,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   // 1. 时段 × 主题矩阵
   const matrixMap = new Map<string, number>();
   for (const p of processed) {
-    const hourSplit = splitByHour(p.session.ts, p.session.activeSeconds);
+    const hourSplit = sessionHourSplit(p.session);
     for (const [hour, secs] of hourSplit) {
       const key = `${hour}|${p.top}`;
       matrixMap.set(key, (matrixMap.get(key) ?? 0) + secs);
@@ -321,7 +322,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   // 9. 写作高峰（24h 读写分布，按读写比例切分到小时）
   const peakMap = new Map<number, { read: number; write: number }>();
   for (const p of processed) {
-    const hourSplit = splitByHour(p.session.ts, p.session.activeSeconds);
+    const hourSplit = sessionHourSplit(p.session);
     const total = p.readSeconds + p.writeSeconds;
     const writeRatio = total > 0 ? p.writeSeconds / total : 0;
     for (const [hour, secs] of hourSplit) {
@@ -459,6 +460,31 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     docActivityQuarterly,
     docActivityYearly,
   };
+}
+
+/** 取 session 的活跃段；缺省回退为 [ts, ts + activeSeconds*1000] */
+function sessionSegments(session: SessionEvent): [number, number][] {
+  if (session.activeSegments && session.activeSegments.length > 0) {
+    return session.activeSegments;
+  }
+  return [[session.ts, session.ts + session.activeSeconds * 1000]];
+}
+
+/** 活跃段是否包含某时间点 */
+function segmentContains(segments: [number, number][], ts: number): boolean {
+  return segments.some(([s, e]) => ts >= s && ts < e);
+}
+
+/** 按小时切分 session 的活跃段（多段分别切分再合并） */
+function sessionHourSplit(session: SessionEvent): Map<number, number> {
+  const result = new Map<number, number>();
+  for (const [start, end] of sessionSegments(session)) {
+    const split = splitByHour(start, (end - start) / 1000);
+    for (const [hour, secs] of split) {
+      result.set(hour, (result.get(hour) ?? 0) + secs);
+    }
+  }
+  return result;
 }
 
 /** 把活跃区间 [ts, ts + activeSeconds*1000] 按小时边界切分，返回 hour → seconds */

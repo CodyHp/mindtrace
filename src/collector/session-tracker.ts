@@ -20,6 +20,8 @@ interface ActiveSession {
   paused: boolean;
   totalChars: number;
   totalWords: number;
+  /** 已结算的活跃段（epoch ms 起止） */
+  segments: [number, number][];
 }
 
 /**
@@ -132,6 +134,7 @@ export class SessionTracker {
       paused: false,
       totalChars: 0,
       totalWords: 0,
+      segments: [],
     };
     this.lastActivityTs = now;
     const file = view.file ?? null;
@@ -157,7 +160,10 @@ export class SessionTracker {
   private settle(): void {
     if (!this.current) return;
     const seg = (this.current.lastActiveTs - this.current.lastSettledTs) / 1000;
-    if (seg > 0) this.current.accumulatedSeconds += seg;
+    if (seg > 0) {
+      this.current.accumulatedSeconds += seg;
+      this.current.segments.push([this.current.lastSettledTs, this.current.lastActiveTs]);
+    }
     this.current.lastSettledTs = this.current.lastActiveTs;
   }
 
@@ -180,6 +186,7 @@ export class SessionTracker {
         endedBy: reason,
         totalChars: sess.totalChars,
         totalWords: sess.totalWords,
+        activeSegments: sess.segments.length > 0 ? sess.segments : undefined,
       },
       true,
     );
