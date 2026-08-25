@@ -72,11 +72,15 @@ describe("buildReport", () => {
     expect(hour10?.seconds).toBeCloseTo(1800);
   });
 
-  it("字数趋势：新增字数与总字数快照", () => {
-    const s = makeSession({ totalChars: 500 });
-    const e: EditEvent = { type: "edit", ts: s.ts + 1000, notePath: s.notePath, charDelta: 100, wordDelta: 10 };
-    const r = buildReport([s, e], settings);
-    expect(r.wordTrend[0].addedChars).toBe(100);
-    expect(r.wordTrend[0].totalChars).toBe(500);
+  it("字数趋势：基于 idle 采样的 edit 事件算新增/删除", () => {
+    const s = makeSession();
+    const e1: EditEvent = { type: "edit", ts: s.ts + 1000, notePath: "哲学/康德.md", charDelta: 100, wordDelta: 10 };
+    const e2: EditEvent = { type: "edit", ts: s.ts + 2000, notePath: "哲学/康德.md", charDelta: -30, wordDelta: -3 };
+    const r = buildReport([s, e1, e2], settings);
+    const day = r.wordTrend[0];
+    expect(day.addedChars).toBe(100);
+    expect(day.deletedChars).toBe(30);
+    expect(day.netChars).toBe(70);
+    expect(day.totalChars).toBe(70); // 累计净字数
   });
 });

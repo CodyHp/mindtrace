@@ -73,11 +73,11 @@ describe("buildReport 新增指标", () => {
     expect(total).toBe(1800);
   });
 
-  it("docGrowth：编辑产生累计字数曲线", () => {
+  it("docGrowth：用 idle 采样的 edit 事件累计生成字数曲线", () => {
     const now = Date.now();
-    const s = makeSession({ notePath: "成长.md", activeSeconds: 300 });
-    const e1: EditEvent = { type: "edit", ts: now - 1000, notePath: "成长.md", charDelta: 50, wordDelta: 5 };
-    const e2: EditEvent = { type: "edit", ts: now, notePath: "成长.md", charDelta: 30, wordDelta: 3 };
+    const s = makeSession({ notePath: "成长.md", ts: now - 3000 });
+    const e1: EditEvent = { type: "edit", ts: now - 2000, notePath: "成长.md", charDelta: 50, wordDelta: 5 };
+    const e2: EditEvent = { type: "edit", ts: now - 1000, notePath: "成长.md", charDelta: 30, wordDelta: 3 };
     const r = buildReport([s, e1, e2], settings);
     const g = r.docGrowth.find((d) => d.notePath === "成长.md");
     expect(g?.points).toHaveLength(2);

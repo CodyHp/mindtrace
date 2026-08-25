@@ -171,13 +171,19 @@ export interface Report {
 /** 从原始事件流构建完整报表数据 */
 export function buildReport(events: TrackedEvent[], settings: MindTraceSettings): Report {
   const sessions = events.filter((e): e is SessionEvent => e.type === "session");
-  const edits = events.filter((e): e is EditEvent => e.type === "edit");
+  const edits = events.filter((e): e is EditEvent => e.type === "edit").sort((a, b) => a.ts - b.ts);
 
-  const editsByPath = new Map<string, EditEvent[]>();
+  // idle 采样的字数变化（edit 事件）聚合：按天 / 按文档
+  const editAddedByDay = new Map<string, number>();
+  const editDeletedByDay = new Map<string, number>();
+  const editAddedByDoc = new Map<string, number>();
   for (const e of edits) {
-    const list = editsByPath.get(e.notePath) ?? [];
-    list.push(e);
-    editsByPath.set(e.notePath, list);
+    const day = localDay(e.ts);
+    const added = Math.max(0, e.charDelta);
+    const deleted = Math.max(0, -e.charDelta);
+    editAddedByDay.set(day, (editAddedByDay.get(day) ?? 0) + added);
+    editDeletedByDay.set(day, (editDeletedByDay.get(day) ?? 0) + deleted);
+    editAddedByDoc.set(e.notePath, (editAddedByDoc.get(e.notePath) ?? 0) + added);
   }
 
   const processed: ProcessedSession[] = [];
@@ -186,16 +192,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     const levels = folderLevels(s.notePath);
     const folders = levels.length > 0 ? levels : [UNCATEGORIZED];
     const top = levels.length > 0 ? levels[0] : UNCATEGORIZED;
-    const segs = sessionSegments(s);
-    const sessionEdits = (editsByPath.get(s.notePath) ?? []).filter(
-      (e) => segmentContains(segs, e.ts),
-    );
-    const { readSeconds, writeSeconds } = classifyReadWrite(
-      s,
-      sessionEdits,
-      settings.sliceSec,
-      settings.writeCharThreshold,
-    );
+    const { readSeconds, writeSeconds } = classifyReadWrite(s);
     processed.push({ session: s, folders, top, readSeconds, writeSeconds });
   }
 
@@ -238,33 +235,21 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     .map(([day, v]) => ({ day, readSeconds: Math.round(v.read), writeSeconds: Math.round(v.write) }))
     .sort((a, b) => a.day.localeCompare(b.day));
 
-  // 4. 字数趋势（按天）
-  const wordMap = new Map<string, { added: number; deleted: number; total: number; totalTs: number }>();
-  for (const e of edits) {
-    const day = localDay(e.ts);
-    const cur = wordMap.get(day) ?? { added: 0, deleted: 0, total: 0, totalTs: 0 };
-    cur.added += e.addedChars ?? Math.max(0, e.charDelta);
-    cur.deleted += e.deletedChars ?? Math.max(0, -e.charDelta);
-    wordMap.set(day, cur);
+  // 4. 字数趋势（按天，基于 idle 采样的 edit 事件：净新增 / 净删除）
+  const sortedEditDays = [...new Set([...editAddedByDay.keys(), ...editDeletedByDay.keys()])].sort();
+  let runningNet = 0;
+  const netTotalByDay = new Map<string, number>();
+  for (const day of sortedEditDays) {
+    runningNet += (editAddedByDay.get(day) ?? 0) - (editDeletedByDay.get(day) ?? 0);
+    netTotalByDay.set(day, runningNet);
   }
-  for (const p of processed) {
-    const day = localDay(p.session.ts);
-    const cur = wordMap.get(day) ?? { added: 0, deleted: 0, total: 0, totalTs: 0 };
-    if (p.session.ts >= cur.totalTs) {
-      cur.totalTs = p.session.ts;
-      cur.total = p.session.totalChars;
-    }
-    wordMap.set(day, cur);
-  }
-  const wordTrend: WordTrendDay[] = [...wordMap.entries()]
-    .map(([day, v]) => ({
-      day,
-      addedChars: v.added,
-      deletedChars: v.deleted,
-      netChars: v.added - v.deleted,
-      totalChars: v.total,
-    }))
-    .sort((a, b) => a.day.localeCompare(b.day));
+  const wordTrend: WordTrendDay[] = sortedEditDays.map((day) => ({
+    day,
+    addedChars: editAddedByDay.get(day) ?? 0,
+    deletedChars: editDeletedByDay.get(day) ?? 0,
+    netChars: (editAddedByDay.get(day) ?? 0) - (editDeletedByDay.get(day) ?? 0),
+    totalChars: netTotalByDay.get(day) ?? 0,
+  }));
 
   // 5 / 6. 文档频率 + 遗忘 + 复访模式
   const docMap = new Map<string, { count: number; lastTs: number; totalSeconds: number }>();
@@ -303,18 +288,13 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   }
   revisit.sort((a, b) => b.count - a.count);
 
-  // 6.5 文档表现（热门 / 趋势）
-  const docPerfAdded = new Map<string, number>();
-  for (const e of edits) {
-    const added = e.addedChars ?? Math.max(0, e.charDelta);
-    docPerfAdded.set(e.notePath, (docPerfAdded.get(e.notePath) ?? 0) + added);
-  }
+  // 6.5 文档表现（热门 / 趋势，字数用 idle 采样的 edit 事件净新增）
   const docPerformance: DocPerformance[] = [...docMap.entries()]
     .map(([notePath, v]) => ({
       notePath,
       views: v.count,
       activeSeconds: Math.round(v.totalSeconds),
-      addedChars: docPerfAdded.get(notePath) ?? 0,
+      addedChars: editAddedByDoc.get(notePath) ?? 0,
       lastTs: v.lastTs,
     }))
     .sort((a, b) => b.activeSeconds - a.activeSeconds)
@@ -351,19 +331,14 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     todayWrite += p.writeSeconds;
     todayFolderMap.set(p.top, (todayFolderMap.get(p.top) ?? 0) + p.readSeconds + p.writeSeconds);
   }
-  let todayWritten = 0;
-  let todayNet = 0;
-  for (const e of edits) {
-    if (localDay(e.ts) !== todayStr) continue;
-    todayWritten += e.addedChars ?? Math.max(0, e.charDelta);
-    todayNet += e.charDelta;
-  }
+  const todayAdded = editAddedByDay.get(todayStr) ?? 0;
+  const todayNet = todayAdded - (editDeletedByDay.get(todayStr) ?? 0);
   const today: TodaySummary = {
     day: todayStr,
     activeSeconds: Math.round(todayActive),
     readSeconds: Math.round(todayRead),
     writeSeconds: Math.round(todayWrite),
-    addedChars: todayWritten,
+    addedChars: todayAdded,
     netChars: todayNet,
     topFolders: [...todayFolderMap.entries()]
       .map(([folder, seconds]) => ({ folder, seconds: Math.round(seconds) }))
@@ -434,7 +409,9 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
 
   // 11.6 文档活跃度（周/月/年三种粒度的去重篇数）
   const activeDocEvents = processed.map((p) => ({ ts: p.session.ts, notePath: p.session.notePath }));
-  const writeDocEvents = edits.filter((e) => e.charDelta > 0).map((e) => ({ ts: e.ts, notePath: e.notePath }));
+  const writeDocEvents = edits
+    .filter((e) => e.charDelta > 0)
+    .map((e) => ({ ts: e.ts, notePath: e.notePath }));
   const docActivityDaily = buildDocActivity(activeDocEvents, writeDocEvents, localDay);
   const docActivityWeekly = buildDocActivity(activeDocEvents, writeDocEvents, weekKey);
   const docActivityMonthly = buildDocActivity(activeDocEvents, writeDocEvents, monthKey);
@@ -465,12 +442,12 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     return { weekday: Number(k.slice(0, idx)), hour: Number(k.slice(idx + 1)), seconds: Math.round(v) };
   });
 
-  // 13. 单篇字数增长（top 高频文档的累计新增字数曲线）
+  // 13. 单篇字数增长（top 高频文档的 edit 事件累计轨迹）
   const growthMap = new Map<string, { ts: number; cumulative: number }[]>();
   for (const e of edits) {
     const list = growthMap.get(e.notePath) ?? [];
-    const last = list.length > 0 ? list[list.length - 1].cumulative : 0;
-    list.push({ ts: e.ts, cumulative: last + e.charDelta });
+    const prev = list.length > 0 ? list[list.length - 1].cumulative : 0;
+    list.push({ ts: e.ts, cumulative: prev + e.charDelta });
     growthMap.set(e.notePath, list);
   }
   const docGrowth: DocGrowth[] = frequentDocs

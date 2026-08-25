@@ -33,10 +33,13 @@ export class SessionTracker {
   private lastActivityTs = 0;
   private heartbeatId: number | null = null;
   private lastPointerMoveTs = 0;
-  private composing = false;
-  private composeStartChars = 0;
-  private composeStartWords = 0;
-  private skipNextEdit = false;
+  private sampleTimerId: number | null = null;
+  private lastSampledChars: number | null = null;
+  private lastSampledWords: number | null = null;
+  private lastSampledPath: string | null = null;
+  private lastSampledAt = 0;
+  /** 停顿多少毫秒算 idle（用于字数采样时机） */
+  private readonly SAMPLE_IDLE_MS = 5000;
 
   constructor(
     private app: App,
@@ -58,16 +61,16 @@ export class SessionTracker {
     window.addEventListener("touchmove", this.onActivity, { passive: true });
     window.addEventListener("blur", this.onBlur);
     window.addEventListener("focus", this.onFocus);
-    window.addEventListener("compositionstart", this.onCompositionStart);
-    window.addEventListener("compositionend", this.onCompositionEnd);
 
     this.heartbeatId = window.setInterval(() => this.heartbeat(), this.settings.heartbeatIntervalSec * 1000);
+    this.sampleTimerId = window.setInterval(() => this.sampleWords(), 1000); // 每秒检查是否停顿，用于字数采样
     this.onLeafChange();
   }
 
   stop(): void {
     this.endSession("shutdown");
     if (this.heartbeatId !== null) window.clearInterval(this.heartbeatId);
+    if (this.sampleTimerId !== null) window.clearInterval(this.sampleTimerId);
     window.removeEventListener("pointerdown", this.onActivity);
     window.removeEventListener("keydown", this.onActivity);
     window.removeEventListener("wheel", this.onActivity);
@@ -75,8 +78,6 @@ export class SessionTracker {
     window.removeEventListener("touchmove", this.onActivity);
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("focus", this.onFocus);
-    window.removeEventListener("compositionstart", this.onCompositionStart);
-    window.removeEventListener("compositionend", this.onCompositionEnd);
   }
 
   /** 重启心跳定时器（心跳间隔设置变更时调用） */
@@ -85,47 +86,18 @@ export class SessionTracker {
     this.heartbeatId = window.setInterval(() => this.heartbeat(), this.settings.heartbeatIntervalSec * 1000);
   }
 
-  /** 全局编辑器扩展：监听所有 markdown 编辑变化，落盘 edit 事件 */
+  /** 全局编辑器扩展：编辑变化仅用于标记「活动」，字数由 idle 采样落盘（见 sampleWords） */
   editorExtension(): Extension {
     return EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
-      // IME 组合期的中间态（拼音字母增删）不记录；最终 change 由 compositionend 统一记录
-      if (this.composing) return;
-      if (this.skipNextEdit) {
-        this.skipNextEdit = false;
-        return;
-      }
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (!view || !view.file || this.isExcluded(view.file.path)) return;
-
-      let charDelta = 0;
-      let wordDelta = 0;
-      let addedChars = 0;
-      let deletedChars = 0;
-      update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-        const removed = update.startState.doc.sliceString(fromA, toA);
-        const ins = inserted.toString();
-        charDelta += countChars(ins) - countChars(removed);
-        wordDelta += countWords(ins) - countWords(removed);
-        addedChars += countChars(ins);
-        deletedChars += countChars(removed);
-      });
-
       const now = Date.now();
       this.lastActivityTs = now;
       if (this.current) {
         this.current.lastActiveTs = now;
         this.current.paused = false;
       }
-      this.eventLog.append({
-        type: "edit",
-        ts: now,
-        notePath: view.file.path,
-        charDelta,
-        wordDelta,
-        addedChars,
-        deletedChars,
-      });
     });
   }
 
@@ -157,6 +129,12 @@ export class SessionTracker {
       segments: [],
     };
     this.lastActivityTs = now;
+    // 同步采样基准：用编辑器当前内容，避免 IME 中间态
+    const content = view.editor.getValue();
+    this.lastSampledChars = countChars(content);
+    this.lastSampledWords = countWords(content);
+    this.lastSampledPath = notePath;
+    this.lastSampledAt = 0; // 尚未采样，允许首次 idle 采样
     const file = view.file ?? null;
     void this.sampleTotalCount(file).then(({ chars, words }) => {
       if (this.current && this.current.notePath === notePath) {
@@ -194,22 +172,27 @@ export class SessionTracker {
     this.current = null;
     const activeSeconds = Math.round(sess.accumulatedSeconds);
     if (activeSeconds < this.settings.minSessionSec) return;
-    this.eventLog.append(
-      {
-        type: "session",
-        ts: sess.startTs,
-        endTs: Date.now(),
-        notePath: sess.notePath,
-        noteTitle: sess.noteTitle,
-        mode: sess.mode,
-        activeSeconds,
-        endedBy: reason,
-        totalChars: sess.totalChars,
-        totalWords: sess.totalWords,
-        activeSegments: sess.segments.length > 0 ? sess.segments : undefined,
-      },
-      true,
-    );
+    const file = this.app.vault.getAbstractFileByPath(sess.notePath);
+    void this.sampleTotalCount(file instanceof TFile ? file : null).then(({ chars, words }) => {
+      this.eventLog.append(
+        {
+          type: "session",
+          ts: sess.startTs,
+          endTs: Date.now(),
+          notePath: sess.notePath,
+          noteTitle: sess.noteTitle,
+          mode: sess.mode,
+          activeSeconds,
+          endedBy: reason,
+          totalChars: sess.totalChars,
+          totalWords: sess.totalWords,
+          totalCharsEnd: chars,
+          totalWordsEnd: words,
+          activeSegments: sess.segments.length > 0 ? sess.segments : undefined,
+        },
+        true,
+      );
+    });
   }
 
   private heartbeat(): void {
@@ -217,6 +200,47 @@ export class SessionTracker {
     if (Date.now() - this.lastActivityTs >= this.settings.idleThresholdSec * 1000) {
       this.endSession("idle");
     }
+  }
+
+  /**
+   * 空闲采样：停顿 SAMPLE_IDLE_MS 后，把当前文档字数与上一次采样做差，
+   * 落一条 edit 事件（净新增记 +chars，净减少记 -chars）。
+   * 不做逐字符跟踪，避免 IME 组合中间态导致的字数虚高。
+   */
+  private sampleWords(): void {
+    if (!this.current) return;
+    const now = Date.now();
+    if (now - this.lastActivityTs < this.SAMPLE_IDLE_MS) return; // 停顿不足，跳过
+    if (this.lastSampledAt >= this.lastActivityTs) return; // 本次停顿已采样过
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.file || this.isExcluded(view.file.path)) return;
+    const path = view.file.path;
+    if (path !== this.current.notePath) return;
+    const content = view.editor.getValue();
+    const chars = countChars(content);
+    const words = countWords(content);
+    this.lastSampledAt = now;
+    if (this.lastSampledPath === path && this.lastSampledChars !== null) {
+      const charDelta = chars - this.lastSampledChars;
+      const wordDelta = words - (this.lastSampledWords ?? 0);
+      if (charDelta !== 0) {
+        this.eventLog.append(
+          {
+            type: "edit",
+            ts: now,
+            notePath: path,
+            charDelta,
+            wordDelta,
+            addedChars: Math.max(0, charDelta),
+            deletedChars: Math.max(0, -charDelta),
+          },
+          true,
+        );
+      }
+    }
+    this.lastSampledChars = chars;
+    this.lastSampledWords = words;
+    this.lastSampledPath = path;
   }
 
   private onActivity = (): void => {
@@ -254,41 +278,6 @@ export class SessionTracker {
     } else {
       this.tryResume();
     }
-  };
-
-  private onCompositionStart = (): void => {
-    this.composing = true;
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    this.composeStartChars = view?.file ? countChars(view.editor.getValue()) : 0;
-    this.composeStartWords = view?.file ? countWords(view.editor.getValue()) : 0;
-  };
-
-  private onCompositionEnd = (): void => {
-    if (!this.composing) return;
-    this.composing = false;
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view?.file || this.isExcluded(view.file.path)) return;
-    const nowChars = countChars(view.editor.getValue());
-    const nowWords = countWords(view.editor.getValue());
-    const charDelta = nowChars - this.composeStartChars;
-    const wordDelta = nowWords - this.composeStartWords;
-    if (charDelta === 0 && wordDelta === 0) return;
-    const now = Date.now();
-    this.skipNextEdit = true; // 跳过紧接着的最终 change，避免双重记录
-    this.lastActivityTs = now;
-    if (this.current) {
-      this.current.lastActiveTs = now;
-      this.current.paused = false;
-    }
-    this.eventLog.append({
-      type: "edit",
-      ts: now,
-      notePath: view.file.path,
-      charDelta,
-      wordDelta,
-      addedChars: Math.max(0, charDelta),
-      deletedChars: Math.max(0, -charDelta),
-    });
   };
 
   private tryResume(): void {
