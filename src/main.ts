@@ -135,8 +135,10 @@ export default class MindTracePlugin extends Plugin {
     const loading = el.createEl("div", { cls: "mindtrace-loading", text: t("loading") });
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
-      // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）
-      const filtered = events.filter((ev) => this.pathExists(ev.notePath));
+      // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）与看板笔记自身
+      const filtered = events.filter(
+        (ev) => ev.notePath !== this.settings.dashboardPath && this.pathExists(ev.notePath),
+      );
       // report 缓存：事件流引用未变（loadEvents 命中缓存）则复用上次报表
       let report: Report;
       if (this.lastEventsRef === events) {

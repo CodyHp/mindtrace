@@ -300,6 +300,8 @@ export class SessionTracker {
   }
 
   private isExcluded(path: string): boolean {
+    // 看板笔记是插件自身产物，永不追踪
+    if (path === this.settings.dashboardPath) return true;
     return this.settings.excludePaths.some((p) => path === p || path.startsWith(p + "/"));
   }
 }
