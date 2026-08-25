@@ -20,6 +20,9 @@ interface ActiveSession {
   paused: boolean;
   totalChars: number;
   totalWords: number;
+  /** 最近一次采样的字数（用于计算净增减，随采样/结束推进） */
+  lastSampledChars: number;
+  lastSampledWords: number;
   /** 已结算的活跃段（epoch ms 起止） */
   segments: [number, number][];
 }
@@ -34,9 +37,6 @@ export class SessionTracker {
   private heartbeatId: number | null = null;
   private lastPointerMoveTs = 0;
   private sampleTimerId: number | null = null;
-  private lastSampledChars: number | null = null;
-  private lastSampledWords: number | null = null;
-  private lastSampledPath: string | null = null;
   private lastSampledAt = 0;
   /** 停顿多少毫秒算 idle（用于字数采样时机） */
   private readonly SAMPLE_IDLE_MS = 5000;
@@ -90,8 +90,6 @@ export class SessionTracker {
   editorExtension(): Extension {
     return EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
-      const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-      if (!view || !view.file || this.isExcluded(view.file.path)) return;
       const now = Date.now();
       this.lastActivityTs = now;
       if (this.current) {
@@ -115,6 +113,8 @@ export class SessionTracker {
 
   private beginSession(view: MarkdownView, notePath: string): void {
     const now = Date.now();
+    // 同步采样基准：用编辑器当前内容，避免 IME 中间态
+    const content = view.editor.getValue();
     this.current = {
       notePath,
       noteTitle: view.file?.basename ?? notePath,
@@ -126,14 +126,11 @@ export class SessionTracker {
       paused: false,
       totalChars: 0,
       totalWords: 0,
+      lastSampledChars: countChars(content),
+      lastSampledWords: countWords(content),
       segments: [],
     };
     this.lastActivityTs = now;
-    // 同步采样基准：用编辑器当前内容，避免 IME 中间态
-    const content = view.editor.getValue();
-    this.lastSampledChars = countChars(content);
-    this.lastSampledWords = countWords(content);
-    this.lastSampledPath = notePath;
     this.lastSampledAt = 0; // 尚未采样，允许首次 idle 采样
     const file = view.file ?? null;
     void this.sampleTotalCount(file).then(({ chars, words }) => {
@@ -174,6 +171,23 @@ export class SessionTracker {
     if (activeSeconds < this.settings.minSessionSec) return;
     const file = this.app.vault.getAbstractFileByPath(sess.notePath);
     void this.sampleTotalCount(file instanceof TFile ? file : null).then(({ chars, words }) => {
+      // 兜底采样：session 内最后一次采样到结束的净增减（覆盖「写完就切走」场景）
+      const charDelta = chars - sess.lastSampledChars;
+      const wordDelta = words - sess.lastSampledWords;
+      if (charDelta !== 0) {
+        this.eventLog.append(
+          {
+            type: "edit",
+            ts: Date.now(),
+            notePath: sess.notePath,
+            charDelta,
+            wordDelta,
+            addedChars: Math.max(0, charDelta),
+            deletedChars: Math.max(0, -charDelta),
+          },
+          true,
+        );
+      }
       this.eventLog.append(
         {
           type: "session",
@@ -220,27 +234,25 @@ export class SessionTracker {
     const chars = countChars(content);
     const words = countWords(content);
     this.lastSampledAt = now;
-    if (this.lastSampledPath === path && this.lastSampledChars !== null) {
-      const charDelta = chars - this.lastSampledChars;
-      const wordDelta = words - (this.lastSampledWords ?? 0);
-      if (charDelta !== 0) {
-        this.eventLog.append(
-          {
-            type: "edit",
-            ts: now,
-            notePath: path,
-            charDelta,
-            wordDelta,
-            addedChars: Math.max(0, charDelta),
-            deletedChars: Math.max(0, -charDelta),
-          },
-          true,
-        );
-      }
+    const cur = this.current;
+    const charDelta = chars - cur.lastSampledChars;
+    const wordDelta = words - cur.lastSampledWords;
+    cur.lastSampledChars = chars;
+    cur.lastSampledWords = words;
+    if (charDelta !== 0) {
+      this.eventLog.append(
+        {
+          type: "edit",
+          ts: now,
+          notePath: path,
+          charDelta,
+          wordDelta,
+          addedChars: Math.max(0, charDelta),
+          deletedChars: Math.max(0, -charDelta),
+        },
+        true,
+      );
     }
-    this.lastSampledChars = chars;
-    this.lastSampledWords = words;
-    this.lastSampledPath = path;
   }
 
   private onActivity = (): void => {

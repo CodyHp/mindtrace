@@ -1,4 +1,4 @@
-import { Plugin, TFile } from "obsidian";
+import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SessionTracker } from "./collector/session-tracker";
 import { buildReport } from "./report/aggregate";
 import { loadEvents } from "./report/loader";
@@ -19,6 +19,7 @@ export default class MindTracePlugin extends Plugin {
   private sessionTracker: SessionTracker | null = null;
   private renderedBlocks = new Set<HTMLElement>();
   private pathExistsCache = new Map<string, boolean>();
+  private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -52,6 +53,19 @@ export default class MindTracePlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor("mindtrace", (_source, el) => {
       void this.renderCodeBlock(el);
     });
+
+    // 切回看板笔记时自动刷新，避免旧数据残留；300ms 节流避免快速切换时重复重绘
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view?.file?.path !== this.settings.dashboardPath) return;
+        if (this.refreshTimer !== null) return;
+        this.refreshTimer = window.setTimeout(() => {
+          this.refreshTimer = null;
+          void this.refreshAllBlocks();
+        }, 300);
+      }),
+    );
 
     this.addSettingTab(new MindTraceSettingTab(this.app, this));
   }
