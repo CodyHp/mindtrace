@@ -4,7 +4,7 @@
 
 **See where your attention actually goes.**
 
-Silent, local-first time & writing analytics for Obsidian — turned into a beautiful topic × time dashboard.
+A silent, local-first **time & attention tracker** for Obsidian — a beautiful topic × time dashboard that reveals your focus, your writing output, and your habits.
 
 [![GitHub release](https://img.shields.io/github/v/release/CodyHp/mindtrace?style=flat-square)](https://github.com/CodyHp/mindtrace/releases)
 [![License](https://img.shields.io/github/license/CodyHp/mindtrace?style=flat-square)](LICENSE)
@@ -15,7 +15,7 @@ Silent, local-first time & writing analytics for Obsidian — turned into a beau
 
 ## ✨ The one chart that explains your day
 
-MindTrace runs in the background and quietly records how long you spend on each note — reading and writing — then rolls everything up by **folder** and plots it as a **topic × time heatmap**. One glance, and you can see "mornings are for philosophy, afternoons for code."
+MindTrace is a zero-friction **time tracker and attention analytics** plugin. It runs in the background and quietly records how long you spend on each note — reading and writing — then rolls everything up by **folder** and plots it as a **topic × time heatmap**. One glance, and you can see "mornings are for philosophy, afternoons for code."
 
 <p align="center"><img src="images/time-topic.png" alt="Topic × time heatmap" width="80%"></p>
 
@@ -25,6 +25,7 @@ MindTrace runs in the background and quietly records how long you spend on each 
 - **Folder = topic** — your vault is already organized; MindTrace treats your folder tree as the taxonomy and rolls time up recursively, drillable from topic → subfolder → file.
 - **Read vs. write, inferred** — a transparent heuristic splits your active time into reading and writing, no manual tagging.
 - **100% local** — everything lives in your vault. No account, no cloud, no telemetry, no note content is ever read.
+- **Quantified self** — not a productivity nag, but a mirror: plain-language daily insights like "your most invested topic is philosophy" help you reflect, not judge.
 
 ## 📊 A dashboard full of insight
 
