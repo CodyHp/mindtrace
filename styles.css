@@ -159,6 +159,10 @@
   gap: 20px;
 }
 
+.mindtrace-doc-cols > div {
+  min-width: 0;
+}
+
 .mindtrace-doc-row {
   display: flex;
   justify-content: space-between;
@@ -173,6 +177,8 @@
 }
 
 .mindtrace-doc-path {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

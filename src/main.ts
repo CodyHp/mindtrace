@@ -18,6 +18,7 @@ export default class MindTracePlugin extends Plugin {
   private eventLog: EventLog | null = null;
   private sessionTracker: SessionTracker | null = null;
   private renderedBlocks = new Set<HTMLElement>();
+  private pathExistsCache = new Map<string, boolean>();
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -101,10 +102,13 @@ export default class MindTracePlugin extends Plugin {
 
   async renderCodeBlock(el: HTMLElement): Promise<void> {
     this.renderedBlocks.add(el);
+    this.pathExistsCache.clear();
     const loading = el.createEl("div", { cls: "mindtrace-loading", text: t("loading") });
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
-      const report = buildReport(events, this.settings);
+      // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）
+      const filtered = events.filter((ev) => this.pathExists(ev.notePath));
+      const report = buildReport(filtered, this.settings);
       loading.remove();
       el.empty();
       // 等两帧，确保代码块容器完成布局，ECharts 才能拿到正确尺寸
@@ -117,6 +121,13 @@ export default class MindTracePlugin extends Plugin {
     } catch (e) {
       loading.textContent = t("loadFailed") + String(e);
     }
+  }
+
+  private pathExists(path: string): boolean {
+    if (!this.pathExistsCache.has(path)) {
+      this.pathExistsCache.set(path, this.app.vault.getAbstractFileByPath(path) != null);
+    }
+    return this.pathExistsCache.get(path)!;
   }
 
   /** 重新渲染所有已打开的看板代码块（颜色/语言切换后自动刷新） */

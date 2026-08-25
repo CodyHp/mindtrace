@@ -33,6 +33,10 @@ export class SessionTracker {
   private lastActivityTs = 0;
   private heartbeatId: number | null = null;
   private lastPointerMoveTs = 0;
+  private composing = false;
+  private composeStartChars = 0;
+  private composeStartWords = 0;
+  private skipNextEdit = false;
 
   constructor(
     private app: App,
@@ -54,6 +58,8 @@ export class SessionTracker {
     window.addEventListener("touchmove", this.onActivity, { passive: true });
     window.addEventListener("blur", this.onBlur);
     window.addEventListener("focus", this.onFocus);
+    window.addEventListener("compositionstart", this.onCompositionStart);
+    window.addEventListener("compositionend", this.onCompositionEnd);
 
     this.heartbeatId = window.setInterval(() => this.heartbeat(), this.settings.heartbeatIntervalSec * 1000);
     this.onLeafChange();
@@ -69,6 +75,8 @@ export class SessionTracker {
     window.removeEventListener("touchmove", this.onActivity);
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("focus", this.onFocus);
+    window.removeEventListener("compositionstart", this.onCompositionStart);
+    window.removeEventListener("compositionend", this.onCompositionEnd);
   }
 
   /** 重启心跳定时器（心跳间隔设置变更时调用） */
@@ -81,6 +89,12 @@ export class SessionTracker {
   editorExtension(): Extension {
     return EditorView.updateListener.of((update) => {
       if (!update.docChanged) return;
+      // IME 组合期的中间态（拼音字母增删）不记录；最终 change 由 compositionend 统一记录
+      if (this.composing) return;
+      if (this.skipNextEdit) {
+        this.skipNextEdit = false;
+        return;
+      }
       const view = this.app.workspace.getActiveViewOfType(MarkdownView);
       if (!view || !view.file || this.isExcluded(view.file.path)) return;
 
@@ -240,6 +254,41 @@ export class SessionTracker {
     } else {
       this.tryResume();
     }
+  };
+
+  private onCompositionStart = (): void => {
+    this.composing = true;
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    this.composeStartChars = view?.file ? countChars(view.editor.getValue()) : 0;
+    this.composeStartWords = view?.file ? countWords(view.editor.getValue()) : 0;
+  };
+
+  private onCompositionEnd = (): void => {
+    if (!this.composing) return;
+    this.composing = false;
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view?.file || this.isExcluded(view.file.path)) return;
+    const nowChars = countChars(view.editor.getValue());
+    const nowWords = countWords(view.editor.getValue());
+    const charDelta = nowChars - this.composeStartChars;
+    const wordDelta = nowWords - this.composeStartWords;
+    if (charDelta === 0 && wordDelta === 0) return;
+    const now = Date.now();
+    this.skipNextEdit = true; // 跳过紧接着的最终 change，避免双重记录
+    this.lastActivityTs = now;
+    if (this.current) {
+      this.current.lastActiveTs = now;
+      this.current.paused = false;
+    }
+    this.eventLog.append({
+      type: "edit",
+      ts: now,
+      notePath: view.file.path,
+      charDelta,
+      wordDelta,
+      addedChars: Math.max(0, charDelta),
+      deletedChars: Math.max(0, -charDelta),
+    });
   };
 
   private tryResume(): void {
