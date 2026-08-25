@@ -1,13 +1,13 @@
 import { MarkdownView, Plugin, TFile } from "obsidian";
 import { SessionTracker } from "./collector/session-tracker";
-import { buildReport } from "./report/aggregate";
+import { buildReport, Report } from "./report/aggregate";
 import { loadEvents } from "./report/loader";
 import { DEFAULT_SETTINGS } from "./settings";
 import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
 import { Locale, setLocale, t } from "./i18n";
-import { MindTraceSettings } from "./types";
-import { renderReport, setColorTheme as applyColorTheme } from "./view/dashboard";
+import { MindTraceSettings, TrackedEvent } from "./types";
+import { bumpRenderVersion, renderReport, setColorTheme as applyColorTheme, unmountReport } from "./view/dashboard";
 
 function dashboardTemplate(): string {
   return "\n```mindtrace\n```\n";
@@ -20,6 +20,8 @@ export default class MindTracePlugin extends Plugin {
   private renderedBlocks = new Set<HTMLElement>();
   private pathExistsCache = new Map<string, boolean>();
   private refreshTimer: number | null = null;
+  private lastEventsRef: TrackedEvent[] | null = null;
+  private lastReport: Report | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -67,6 +69,18 @@ export default class MindTracePlugin extends Plugin {
       }),
     );
 
+    // Obsidian 主题/字体切换时，图表颜色需要跟随重绘
+    this.registerEvent(
+      this.app.workspace.on("css-change", () => {
+        bumpRenderVersion();
+        if (this.refreshTimer !== null) return;
+        this.refreshTimer = window.setTimeout(() => {
+          this.refreshTimer = null;
+          void this.refreshAllBlocks();
+        }, 300);
+      }),
+    );
+
     this.addSettingTab(new MindTraceSettingTab(this.app, this));
   }
 
@@ -86,6 +100,7 @@ export default class MindTracePlugin extends Plugin {
 
   applyLanguage(language: string): void {
     setLocale(this.resolveLocale(language));
+    bumpRenderVersion(); // 语言变化虽不影响数据，但需要强制重绘文案
     void this.refreshAllBlocks();
   }
 
@@ -122,9 +137,16 @@ export default class MindTracePlugin extends Plugin {
       const events = await loadEvents(this.app, this.settings.dataDir);
       // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）
       const filtered = events.filter((ev) => this.pathExists(ev.notePath));
-      const report = buildReport(filtered, this.settings);
+      // report 缓存：事件流引用未变（loadEvents 命中缓存）则复用上次报表
+      let report: Report;
+      if (this.lastEventsRef === events) {
+        report = this.lastReport!;
+      } else {
+        report = buildReport(filtered, this.settings);
+        this.lastEventsRef = events;
+        this.lastReport = report;
+      }
       loading.remove();
-      el.empty();
       // 等两帧，确保代码块容器完成布局，ECharts 才能拿到正确尺寸
       await new Promise((resolve) => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
@@ -150,6 +172,7 @@ export default class MindTracePlugin extends Plugin {
       if (el.isConnected) {
         await this.renderCodeBlock(el);
       } else {
+        unmountReport(el); // 视图卸载，释放图表实例
         this.renderedBlocks.delete(el);
       }
     }

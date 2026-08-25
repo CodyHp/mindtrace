@@ -34,6 +34,7 @@ let colorThemeOverride: string | null = null;
 
 export function setColorTheme(color: string): void {
   colorThemeOverride = color === "theme" ? null : color;
+  renderVersion++;
 }
 
 function readTheme(): ThemeVars {
@@ -70,13 +71,15 @@ function mixHex(a: string, b: string, t: number): string {
 
 // ---------- 图表实例管理 ----------
 type Chart = ReturnType<typeof echarts.init>;
-let activeCharts: Chart[] = [];
-let resizeObservers: ResizeObserver[] = [];
 
-function initChart(el: HTMLElement): Chart {
-  const chart = echarts.init(el);
-  activeCharts.push(chart);
-  // 容器尺寸变化时自动 resize；加 isDisposed 检查，避免销毁后 resize 的竞态
+/** 每个 chart 实例对应的 ResizeObserver（实例销毁时需 disconnect） */
+const chartObservers = new WeakMap<Chart, ResizeObserver>();
+
+/** 复用 DOM 上已存在的实例，没有才 init（实例随 DOM 走，避免销毁重建） */
+function getOrInitChart(div: HTMLElement): Chart {
+  const existing = echarts.getInstanceByDom(div);
+  if (existing) return existing as Chart;
+  const chart = echarts.init(div);
   const ro = new ResizeObserver(() => {
     try {
       if (!chart.isDisposed()) chart.resize();
@@ -84,16 +87,33 @@ function initChart(el: HTMLElement): Chart {
       // 忽略销毁/过渡期间的 resize 异常
     }
   });
-  ro.observe(el);
-  resizeObservers.push(ro);
+  ro.observe(div);
+  chartObservers.set(chart, ro);
   return chart;
 }
 
-function disposeCharts(): void {
-  for (const ro of resizeObservers) ro.disconnect();
-  resizeObservers = [];
-  for (const c of activeCharts) c.dispose();
-  activeCharts = [];
+/** 释放某个容器下所有 chart 实例（视图卸载时调用） */
+function disposeChartsIn(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>(".mindtrace-chart").forEach((div) => {
+    const chart = echarts.getInstanceByDom(div);
+    if (chart) {
+      chartObservers.get(chart)?.disconnect();
+      chartObservers.delete(chart);
+      chart.dispose();
+    }
+  });
+}
+
+/** 视图卸载时清理该代码块容器内的图表实例与懒加载状态 */
+export function unmountReport(el: HTMLElement): void {
+  const state = rootStates.get(el);
+  if (state) {
+    for (const entry of state.blocks.values()) {
+      entry.io?.disconnect();
+    }
+  }
+  disposeChartsIn(el);
+  rootStates.delete(el);
 }
 
 export function fmtDuration(sec: number): string {
@@ -126,18 +146,39 @@ function displayFolder(folder: string): string {
   return folder === UNCATEGORIZED ? t("uncategorized") : folder;
 }
 
-function card(el: HTMLElement, title: string): HTMLElement {
-  const box = el.createEl("div", { cls: "mindtrace-card" });
-  const h3 = box.createEl("h3");
-  h3.createEl("span", { text: title });
+// ---------- 块容器辅助（复用 DOM，避免每次重绘全量重建） ----------
+function ensureBlock(el: HTMLElement, key: string, title: string, cls = "mindtrace-card"): HTMLElement {
+  const found = el.querySelector<HTMLElement>(`[data-mt-block="${key}"]`);
+  if (found) {
+    if (title) {
+      const span = found.querySelector<HTMLElement>("h3 span");
+      if (span) span.textContent = title;
+    }
+    return found;
+  }
+  const box = el.createEl("div", { cls });
+  box.setAttr("data-mt-block", key);
+  if (title) box.createEl("h3").createEl("span", { text: title });
   return box;
 }
 
-function emptyHint(box: HTMLElement): void {
-  box.createEl("div", {
-    cls: "mindtrace-empty",
-    text: t("empty"),
-  });
+function ensureChartDiv(box: HTMLElement, cls = "mindtrace-chart"): HTMLElement {
+  const found = box.querySelector<HTMLElement>(".mindtrace-chart");
+  if (found) return found;
+  return box.createEl("div", { cls });
+}
+
+/** 空态切换：空则显示提示并隐藏图表容器，非空反之（实例保留，避免销毁） */
+function setEmpty(box: HTMLElement, isEmpty: boolean): void {
+  const chartDiv = box.querySelector<HTMLElement>(".mindtrace-chart");
+  const emptyEl = box.querySelector<HTMLElement>(".mindtrace-empty");
+  if (isEmpty) {
+    chartDiv?.addClass("mindtrace-hidden");
+    if (!emptyEl) box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
+  } else {
+    emptyEl?.remove();
+    chartDiv?.removeClass("mindtrace-hidden");
+  }
 }
 
 // ---------- 导出 ----------
@@ -170,10 +211,11 @@ function toCsv(data: unknown): string | null {
   return [header, ...rows].join("\n");
 }
 
-/** 在卡片标题栏加 PNG / JSON / CSV 导出按钮 */
-function addExportActions(box: HTMLElement, chart: Chart, data: unknown, name: string): void {
+/** 在卡片标题栏重建 PNG / JSON / CSV 导出按钮（按钮少，重建成本低，闭包数据始终最新） */
+function ensureExportActions(box: HTMLElement, chart: Chart, data: unknown, name: string): void {
   const h3 = box.querySelector("h3");
   if (!h3) return;
+  h3.querySelector(".mindtrace-card-actions")?.remove();
   const actions = h3.createEl("div", { cls: "mindtrace-card-actions" });
 
   const pngBtn = actions.createEl("button", { cls: "mindtrace-back", text: "PNG" });
@@ -200,49 +242,189 @@ function addExportActions(box: HTMLElement, chart: Chart, data: unknown, name: s
 }
 
 // ---------- 渲染入口 ----------
-export function renderReport(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
-  disposeCharts();
-  el.empty();
-  el.addClass("mindtrace-report");
+type BlockRender = (box: HTMLElement, report: Report, theme: ThemeVars, openFile?: (path: string) => void) => void;
 
-  const safe = (fn: () => void): void => {
+interface BlockSpec {
+  key: string;
+  title: () => string;
+  render: BlockRender;
+}
+
+const chartBlocks: BlockSpec[] = [
+  { key: "matrix", title: () => t("timeByTopic"), render: renderMatrix },
+  { key: "folder-bars", title: () => t("topicRanking"), render: renderFolderBars },
+  { key: "write-peak", title: () => t("activeHours"), render: renderWritePeak },
+  { key: "calendar", title: () => t("activeCalendar"), render: renderCalendar },
+  { key: "doc-activity", title: () => t("docActivity"), render: renderDocActivity },
+  { key: "week-compare", title: () => t("weekCompare"), render: renderWeekCompare },
+  { key: "weekday", title: () => t("weekdayDist"), render: renderWeekday },
+  { key: "weekday-hour", title: () => t("weekdayHour"), render: renderWeekdayHour },
+  { key: "flow", title: () => t("attentionFlow"), render: renderFlow },
+  { key: "doc-growth", title: () => t("docGrowth"), render: renderDocGrowth },
+  { key: "read-write", title: () => t("readWriteByDay"), render: renderReadWrite },
+  { key: "word-trend", title: () => t("wordTrend"), render: renderWordTrend },
+  { key: "doc-performance", title: () => t("docPerformance"), render: renderDocPerformance },
+  { key: "docs", title: () => t("docProfile"), render: renderDocs },
+  { key: "timeline", title: () => t("timeline"), render: renderTimeline },
+];
+
+// 数据 diff：按容器（el）记录 report 引用 + 渲染版本，都没变则跳过重绘（避免多视图互相干扰）
+interface RenderState {
+  report: Report;
+  version: number;
+  openFile?: (path: string) => void;
+}
+
+const renderStateByEl = new WeakMap<HTMLElement, RenderState>();
+let renderVersion = 0;
+
+/** 主题/语言等非数据变更时调用，强制下次 renderReport 重绘 */
+export function bumpRenderVersion(): void {
+  renderVersion++;
+}
+
+interface BlockEntry {
+  box: HTMLElement;
+  io: IntersectionObserver | null;
+  rendered: boolean;
+}
+
+interface RootState {
+  blocks: Map<string, BlockEntry>;
+}
+
+const rootStates = new WeakMap<HTMLElement, RootState>();
+
+let idleQueue: (() => void)[] = [];
+let idleScheduled = false;
+
+function scheduleIdle(fn: () => void): void {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(() => fn(), { timeout: 600 });
+  } else {
+    setTimeout(fn, 0);
+  }
+}
+
+function enqueueRender(fn: () => void): void {
+  idleQueue.push(fn);
+  if (idleScheduled) return;
+  idleScheduled = true;
+  const run = (): void => {
+    if (idleQueue.length === 0) {
+      idleScheduled = false;
+      return;
+    }
+    const next = idleQueue.shift()!;
     try {
-      fn();
+      next();
     } catch (e) {
       console.error("MindTrace render failed:", e);
     }
+    scheduleIdle(run);
   };
-
-  safe(() => renderKpis(el, report));
-  safe(() => renderToday(el, report));
-
-  if (report.totalSeconds === 0) {
-    const box = card(el, t("startRecording"));
-    emptyHint(box);
-    return;
-  }
-
-  safe(() => renderMatrix(el, report));
-  safe(() => renderFolderBars(el, report.folderTree));
-  safe(() => renderWritePeak(el, report));
-  safe(() => renderCalendar(el, report));
-  safe(() => renderDocActivity(el, report));
-  safe(() => renderWeekCompare(el, report));
-  safe(() => renderWeekday(el, report));
-  safe(() => renderWeekdayHour(el, report));
-  safe(() => renderFlow(el, report));
-  safe(() => renderDocGrowth(el, report));
-  safe(() => renderReadWrite(el, report));
-  safe(() => renderWordTrend(el, report));
-  safe(() => renderDocPerformance(el, report));
-  safe(() => renderDocs(el, report, openFile));
-  safe(() => renderTimeline(el, report));
+  scheduleIdle(run);
 }
 
-function renderKpis(el: HTMLElement, report: Report): void {
-  const kpis = el.createEl("div", { cls: "mindtrace-kpis" });
+export function renderReport(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
+  el.addClass("mindtrace-report");
+  const theme = readTheme();
+
+  // 数据 diff：数据引用 + 渲染版本 + openFile 都没变 → 直接跳过
+  const prev = renderStateByEl.get(el);
+  if (prev && prev.report === report && prev.version === renderVersion && prev.openFile === openFile) {
+    return;
+  }
+  renderStateByEl.set(el, { report, version: renderVersion, openFile });
+
+  // 头部（同步渲染，首屏立即可见）
+  try {
+    const kpis = ensureBlock(el, "kpis", "", "mindtrace-kpis");
+    renderKpis(kpis, report);
+  } catch (e) {
+    console.error("MindTrace render failed:", e);
+  }
+  try {
+    const today = ensureBlock(el, "today", t("today"));
+    renderToday(today, report);
+  } catch (e) {
+    console.error("MindTrace render failed:", e);
+  }
+
+  // 无数据：显示引导提示，隐藏图表块
+  if (report.totalSeconds === 0) {
+    for (const spec of chartBlocks) {
+      el.querySelector(`[data-mt-block="${spec.key}"]`)?.addClass("mindtrace-hidden");
+    }
+    const hint = ensureBlock(el, "start-hint", t("startRecording"));
+    hint.removeClass("mindtrace-hidden");
+    setEmpty(hint, true);
+    return;
+  }
+  el.querySelector('[data-mt-block="start-hint"]')?.addClass("mindtrace-hidden");
+
+  scheduleBlocks(el, report, theme, openFile);
+}
+
+function scheduleBlocks(el: HTMLElement, report: Report, theme: ThemeVars, openFile?: (path: string) => void): void {
+  const isFirst = !rootStates.has(el);
+  let state = rootStates.get(el);
+  if (!state) {
+    state = { blocks: new Map() };
+    rootStates.set(el, state);
+  }
+
+  for (const spec of chartBlocks) {
+    let entry = state.blocks.get(spec.key);
+    if (!entry) {
+      const box = ensureBlock(el, spec.key, spec.title());
+      box.removeClass("mindtrace-hidden");
+      entry = { box, io: null, rendered: false };
+      state.blocks.set(spec.key, entry);
+    } else {
+      entry.box.removeClass("mindtrace-hidden");
+    }
+
+    if (isFirst && !entry.rendered) {
+      // 首次渲染：懒加载，进入视口才真正渲染
+      if (!entry.io) {
+        entry.io = new IntersectionObserver(
+          (records) => {
+            for (const r of records) {
+              if (r.isIntersecting) {
+                entry.io?.disconnect();
+                entry.io = null;
+                entry.rendered = true;
+                enqueueRender(() => {
+                  if (!entry.box.isConnected) return;
+                  spec.render(entry.box, report, theme, openFile);
+                });
+              }
+            }
+          },
+          { rootMargin: "240px" },
+        );
+        entry.io.observe(entry.box);
+      }
+    } else {
+      // 数据更新：全部排队分片渲染（实例已复用，成本低）；停掉未触发的懒加载观察
+      entry.rendered = true;
+      if (entry.io) {
+        entry.io.disconnect();
+        entry.io = null;
+      }
+      enqueueRender(() => {
+        if (!entry.box.isConnected) return;
+        spec.render(entry.box, report, theme, openFile);
+      });
+    }
+  }
+}
+
+function renderKpis(box: HTMLElement, report: Report): void {
+  box.empty();
   const add = (label: string, value: string): void => {
-    const k = kpis.createEl("div", { cls: "mindtrace-kpi" });
+    const k = box.createEl("div", { cls: "mindtrace-kpi" });
     k.createEl("div", { cls: "mindtrace-kpi-value", text: value });
     k.createEl("div", { cls: "mindtrace-kpi-label", text: label });
   };
@@ -252,8 +434,8 @@ function renderKpis(el: HTMLElement, report: Report): void {
   add(t("kpiWrite"), fmtDuration(report.totalWriteSeconds));
 }
 
-function renderToday(el: HTMLElement, report: Report): void {
-  const box = card(el, t("today"));
+function renderToday(box: HTMLElement, report: Report): void {
+  box.empty();
   const today = report.today;
 
   const summary = box.createEl("div", { cls: "mindtrace-today-summary" });
@@ -279,10 +461,7 @@ function renderToday(el: HTMLElement, report: Report): void {
   }
 }
 
-function renderMatrix(el: HTMLElement, report: Report): void {
-  const box = card(el, t("timeByTopic"));
-  const theme = readTheme();
-
+function renderMatrix(box: HTMLElement, report: Report, theme: ThemeVars): void {
   const folderTotals = new Map<string, number>();
   for (const c of report.matrix) folderTotals.set(c.folder, (folderTotals.get(c.folder) ?? 0) + c.seconds);
   const folders = [...folderTotals.entries()]
@@ -290,9 +469,10 @@ function renderMatrix(el: HTMLElement, report: Report): void {
     .slice(0, 12)
     .map((x) => x[0]);
   if (folders.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
 
   const cellMap = new Map<string, number>();
   for (const c of report.matrix) cellMap.set(`${c.hour}|${c.folder}`, c.seconds);
@@ -306,8 +486,8 @@ function renderMatrix(el: HTMLElement, report: Report): void {
     }
   }
 
-  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box, "mindtrace-chart mindtrace-chart-tall");
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: {
       ...baseTooltip(theme),
@@ -335,26 +515,36 @@ function renderMatrix(el: HTMLElement, report: Report): void {
     },
     series: [{ type: "heatmap", data, emphasis: { itemStyle: { borderColor: theme.textNormal, borderWidth: 1 } } }],
   } as any);
-  addExportActions(box, chart, report.matrix, "time-topic");
+  ensureExportActions(box, chart, report.matrix, "time-topic");
 }
 
-function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
-  const box = card(el, t("topicRanking"));
-  const theme = readTheme();
+function renderFolderBars(box: HTMLElement, report: Report, theme: ThemeVars): void {
+  const tree = report.folderTree;
   if (tree.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
 
   const stack: FolderNode[][] = [tree];
   const path: string[] = [];
-  const toolbar = box.createEl("div", { cls: "mindtrace-toolbar" });
-  const pathLabel = toolbar.createEl("span", { cls: "mindtrace-path", text: t("all") });
-  const backBtn = toolbar.createEl("button", { text: t("backUp"), cls: "mindtrace-back" });
+  let toolbar = box.querySelector<HTMLElement>(".mindtrace-toolbar");
+  let pathLabel: HTMLElement;
+  let backBtn: HTMLButtonElement;
+  if (!toolbar) {
+    toolbar = box.createEl("div", { cls: "mindtrace-toolbar" });
+    pathLabel = toolbar.createEl("span", { cls: "mindtrace-path" });
+    backBtn = toolbar.createEl("button", { cls: "mindtrace-back" }) as HTMLButtonElement;
+    backBtn.textContent = t("backUp");
+  } else {
+    pathLabel = toolbar.querySelector<HTMLElement>(".mindtrace-path")!;
+    backBtn = toolbar.querySelector<HTMLButtonElement>("button")!;
+  }
+  pathLabel.textContent = t("all");
   backBtn.addClass("mindtrace-hidden");
 
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
 
   const draw = (): void => {
     const nodes = stack[stack.length - 1];
@@ -386,7 +576,7 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
     else backBtn.addClass("mindtrace-hidden");
   };
 
-  addExportActions(box, chart, tree, "topic-ranking");
+  ensureExportActions(box, chart, tree, "topic-ranking");
 
   backBtn.onclick = (): void => {
     if (stack.length > 1) {
@@ -400,11 +590,9 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
   draw();
 }
 
-function renderWritePeak(el: HTMLElement, report: Report): void {
-  const box = card(el, t("activeHours"));
-  const theme = readTheme();
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+function renderWritePeak(box: HTMLElement, report: Report, theme: ThemeVars): void {
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
     legend: { data: [t("read"), t("write")], top: 0, textStyle: { color: theme.textMuted } },
@@ -416,29 +604,33 @@ function renderWritePeak(el: HTMLElement, report: Report): void {
       { name: t("write"), type: "bar", stack: "t", data: report.writePeak.map((p) => p.writeSeconds), itemStyle: { color: theme.accent } },
     ],
   } as any);
-  addExportActions(box, chart, report.writePeak, "active-hours");
+  ensureExportActions(box, chart, report.writePeak, "active-hours");
 }
 
-function renderCalendar(el: HTMLElement, report: Report): void {
-  const box = card(el, t("activeCalendar"));
-  const theme = readTheme();
-
-  const stats = box.createEl("div", { cls: "mindtrace-calendar-stats" });
-  stats.createEl("span", { text: `${t("currentStreak")} ${t("days", { n: report.streak })}` });
-  stats.createEl("span", { text: `${t("longestStreak")} ${t("days", { n: report.bestStreak })}` });
+function renderCalendar(box: HTMLElement, report: Report, theme: ThemeVars): void {
+  let stats = box.querySelector<HTMLElement>(".mindtrace-calendar-stats");
+  if (!stats) {
+    stats = box.createEl("div", { cls: "mindtrace-calendar-stats" });
+    stats.createEl("span");
+    stats.createEl("span");
+  }
+  const spans = stats.querySelectorAll<HTMLElement>("span");
+  spans[0].textContent = `${t("currentStreak")} ${t("days", { n: report.streak })}`;
+  spans[1].textContent = `${t("longestStreak")} ${t("days", { n: report.bestStreak })}`;
 
   if (report.dailyActive.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
 
   const maxSec = Math.max(1, ...report.dailyActive.map((d) => d.seconds));
   const now = new Date();
   const start = new Date(now);
   start.setDate(start.getDate() - 364); // 近一年
 
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: {
       ...baseTooltip(theme),
@@ -471,13 +663,10 @@ function renderCalendar(el: HTMLElement, report: Report): void {
       },
     ],
   } as any);
-  addExportActions(box, chart, report.dailyActive, "activity-calendar");
+  ensureExportActions(box, chart, report.dailyActive, "activity-calendar");
 }
 
-function renderDocActivity(el: HTMLElement, report: Report): void {
-  const box = card(el, t("docActivity"));
-  const theme = readTheme();
-
+function renderDocActivity(box: HTMLElement, report: Report, theme: ThemeVars): void {
   const modes = [
     { label: t("day"), data: report.docActivityDaily },
     { label: t("week"), data: report.docActivityWeekly },
@@ -485,24 +674,31 @@ function renderDocActivity(el: HTMLElement, report: Report): void {
     { label: t("quarter"), data: report.docActivityQuarterly },
     { label: t("year"), data: report.docActivityYearly },
   ];
-  let currentMode = 2; // 默认月
+  let currentMode = Number(box.dataset.mode ?? 2); // 默认月，跨数据更新保留用户选择
 
-  const switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
-  const buttons: HTMLElement[] = [];
-  modes.forEach((m, i) => {
-    const btn = switcher.createEl("button", { cls: "mindtrace-back", text: m.label });
-    buttons.push(btn);
+  let switcher = box.querySelector<HTMLElement>(".mindtrace-doc-growth-switcher");
+  let buttons: HTMLElement[];
+  if (!switcher) {
+    switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
+    buttons = modes.map(() => switcher!.createEl("button", { cls: "mindtrace-back" }));
+  } else {
+    buttons = Array.from(switcher.querySelectorAll<HTMLElement>("button"));
+  }
+  buttons.forEach((btn, i) => {
+    btn.textContent = modes[i].label;
+    btn.removeClass("mindtrace-active");
     if (i === currentMode) btn.addClass("mindtrace-active");
     btn.onclick = (): void => {
       currentMode = i;
+      box.dataset.mode = String(i);
       buttons.forEach((b) => b.removeClass("mindtrace-active"));
       btn.addClass("mindtrace-active");
       draw();
     };
   });
 
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
 
   const draw = (): void => {
     let data = modes[currentMode].data;
@@ -520,19 +716,18 @@ function renderDocActivity(el: HTMLElement, report: Report): void {
     } as any);
   };
   draw();
-  addExportActions(box, chart, report.docActivityMonthly, "doc-activity");
+  ensureExportActions(box, chart, report.docActivityMonthly, "doc-activity");
 }
 
-function renderWeekCompare(el: HTMLElement, report: Report): void {
-  const box = card(el, t("weekCompare"));
-  const theme = readTheme();
+function renderWeekCompare(box: HTMLElement, report: Report, theme: ThemeVars): void {
   if (report.weekCompare.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
   const folders = report.weekCompare.map((w) => w.folder);
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v: number) => fmtDuration(v) },
     legend: { data: [t("thisWeek"), t("lastWeek")], top: 0, textStyle: { color: theme.textMuted } },
@@ -544,15 +739,13 @@ function renderWeekCompare(el: HTMLElement, report: Report): void {
       { name: t("lastWeek"), type: "bar", data: report.weekCompare.map((w) => w.lastWeek), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.5), borderRadius: [0, 4, 4, 0] } },
     ],
   } as any);
-  addExportActions(box, chart, report.weekCompare, "week-compare");
+  ensureExportActions(box, chart, report.weekCompare, "week-compare");
 }
 
-function renderWeekday(el: HTMLElement, report: Report): void {
-  const box = card(el, t("weekdayDist"));
-  const theme = readTheme();
+function renderWeekday(box: HTMLElement, report: Report, theme: ThemeVars): void {
   const labels = weekdayLabels();
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
     grid: { left: 60, right: 20, top: 16, bottom: 30 },
@@ -560,12 +753,10 @@ function renderWeekday(el: HTMLElement, report: Report): void {
     yAxis: { type: "value", ...axisCommon(theme), axisLabel: { color: theme.textMuted, formatter: (v: number) => fmtDuration(v) } },
     series: [{ type: "bar", data: report.weekday.map((w) => w.seconds), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.25), borderRadius: [4, 4, 0, 0] } }],
   } as any);
-  addExportActions(box, chart, report.weekday, "weekday-distribution");
+  ensureExportActions(box, chart, report.weekday, "weekday-distribution");
 }
 
-function renderWeekdayHour(el: HTMLElement, report: Report): void {
-  const box = card(el, t("weekdayHour"));
-  const theme = readTheme();
+function renderWeekdayHour(box: HTMLElement, report: Report, theme: ThemeVars): void {
   const labels = weekdayLabels();
   const maxSec = Math.max(1, ...report.weekdayHour.map((c) => c.seconds));
 
@@ -580,8 +771,8 @@ function renderWeekdayHour(el: HTMLElement, report: Report): void {
     }
   }
 
-  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box, "mindtrace-chart mindtrace-chart-tall");
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: {
       ...baseTooltip(theme),
@@ -604,16 +795,15 @@ function renderWeekdayHour(el: HTMLElement, report: Report): void {
     },
     series: [{ type: "heatmap", data, emphasis: { itemStyle: { borderColor: theme.textNormal, borderWidth: 1 } } }],
   } as any);
-  addExportActions(box, chart, report.weekdayHour, "weekday-hour");
+  ensureExportActions(box, chart, report.weekdayHour, "weekday-hour");
 }
 
-function renderFlow(el: HTMLElement, report: Report): void {
-  const box = card(el, t("attentionFlow"));
-  const theme = readTheme();
+function renderFlow(box: HTMLElement, report: Report, theme: ThemeVars): void {
   if (report.flow.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
   // 节点度数 = 切换总次数（出度 + 入度），用于节点大小
   const degree = new Map<string, number>();
   for (const f of report.flow) {
@@ -622,8 +812,8 @@ function renderFlow(el: HTMLElement, report: Report): void {
   }
   const maxDegree = Math.max(1, ...degree.values());
 
-  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box, "mindtrace-chart mindtrace-chart-tall");
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: {
       ...baseTooltip(theme),
@@ -655,20 +845,22 @@ function renderFlow(el: HTMLElement, report: Report): void {
       },
     ],
   } as any);
-  addExportActions(box, chart, report.flow, "attention-flow");
+  ensureExportActions(box, chart, report.flow, "attention-flow");
 }
 
-function renderDocGrowth(el: HTMLElement, report: Report): void {
-  const box = card(el, t("docGrowth"));
-  const theme = readTheme();
+function renderDocGrowth(box: HTMLElement, report: Report, theme: ThemeVars): void {
   if (report.docGrowth.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
-  let current = report.docGrowth[0];
-  const title = box.createEl("div", { cls: "mindtrace-doc-growth-title", text: current.notePath });
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  setEmpty(box, false);
+  const docs = report.docGrowth;
+  let current = docs[0];
+  let title = box.querySelector<HTMLElement>(".mindtrace-doc-growth-title");
+  if (!title) title = box.createEl("div", { cls: "mindtrace-doc-growth-title" });
+  title.textContent = current.notePath;
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
 
   const draw = (): void => {
     chart.setOption({
@@ -688,12 +880,12 @@ function renderDocGrowth(el: HTMLElement, report: Report): void {
       ],
     } as any);
   };
-  draw();
-  addExportActions(box, chart, report.docGrowth, "word-growth");
 
-  const switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
+  let switcher = box.querySelector<HTMLElement>(".mindtrace-doc-growth-switcher");
+  if (!switcher) switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
+  switcher.empty();
   const buttons: HTMLElement[] = [];
-  for (const d of report.docGrowth.slice(0, 6)) {
+  for (const d of docs.slice(0, 6)) {
     const btn = switcher.createEl("button", { cls: "mindtrace-back", text: d.notePath.split("/").pop() ?? d.notePath });
     buttons.push(btn);
     btn.onclick = (): void => {
@@ -705,18 +897,19 @@ function renderDocGrowth(el: HTMLElement, report: Report): void {
     };
   }
   if (buttons.length > 0) buttons[0].addClass("mindtrace-active");
+  draw();
+  ensureExportActions(box, chart, docs, "word-growth");
 }
 
-function renderReadWrite(el: HTMLElement, report: Report): void {
-  const box = card(el, t("readWriteByDay"));
-  const theme = readTheme();
+function renderReadWrite(box: HTMLElement, report: Report, theme: ThemeVars): void {
   if (report.readWriteByDay.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
   const days = report.readWriteByDay.slice(-14);
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
     legend: { data: [t("read"), t("write")], top: 0, textStyle: { color: theme.textMuted } },
@@ -728,19 +921,18 @@ function renderReadWrite(el: HTMLElement, report: Report): void {
       { name: t("write"), type: "bar", stack: "t", data: days.map((d) => d.writeSeconds), itemStyle: { color: theme.accent } },
     ],
   } as any);
-  addExportActions(box, chart, report.readWriteByDay, "read-write");
+  ensureExportActions(box, chart, report.readWriteByDay, "read-write");
 }
 
-function renderWordTrend(el: HTMLElement, report: Report): void {
-  const box = card(el, t("wordTrend"));
-  const theme = readTheme();
+function renderWordTrend(box: HTMLElement, report: Report, theme: ThemeVars): void {
   if (report.wordTrend.length === 0) {
-    emptyHint(box);
+    setEmpty(box, true);
     return;
   }
+  setEmpty(box, false);
   const days = report.wordTrend.slice(-14);
-  const div = box.createEl("div", { cls: "mindtrace-chart" });
-  const chart = initChart(div);
+  const div = ensureChartDiv(box);
+  const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis" },
     legend: { data: [t("added"), t("deleted"), t("net")], top: 0, textStyle: { color: theme.textMuted } },
@@ -753,13 +945,13 @@ function renderWordTrend(el: HTMLElement, report: Report): void {
       { name: t("net"), type: "line", data: days.map((d) => d.netChars), lineStyle: { color: theme.accent }, itemStyle: { color: theme.accent }, symbolSize: 6 },
     ],
   } as any);
-  addExportActions(box, chart, report.wordTrend, "word-trend");
+  ensureExportActions(box, chart, report.wordTrend, "word-trend");
 }
 
-function renderDocPerformance(el: HTMLElement, report: Report): void {
-  const box = card(el, t("docPerformance"));
+function renderDocPerformance(box: HTMLElement, report: Report): void {
+  box.empty();
   if (report.docPerformance.length === 0) {
-    emptyHint(box);
+    box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
     return;
   }
   const table = box.createEl("table", { cls: "mindtrace-table" });
@@ -778,15 +970,14 @@ function renderDocPerformance(el: HTMLElement, report: Report): void {
   }
 }
 
-function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
-  const box = card(el, t("docProfile"));
-  const theme = readTheme();
+function renderDocs(box: HTMLElement, report: Report, theme: ThemeVars, openFile?: (path: string) => void): void {
+  box.empty();
   const cols = box.createEl("div", { cls: "mindtrace-doc-cols" });
 
   const forgotBox = cols.createEl("div");
   forgotBox.createEl("h4", { text: t("forgotten") });
   if (report.forgottenDocs.length === 0) {
-    emptyHint(forgotBox);
+    forgotBox.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
   } else {
     for (const d of report.forgottenDocs.slice(0, 10)) {
       const row = forgotBox.createEl("div", { cls: "mindtrace-doc-row" });
@@ -798,7 +989,7 @@ function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) =
   const revisitBox = cols.createEl("div");
   revisitBox.createEl("h4", { text: t("revisitMode") });
   if (report.revisit.length === 0) {
-    emptyHint(revisitBox);
+    revisitBox.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
   } else {
     for (const d of report.revisit) {
       const row = revisitBox.createEl("div", { cls: "mindtrace-doc-row" });
@@ -828,10 +1019,10 @@ function modeLabel(mode: RevisitMode): string {
   return t("stuck");
 }
 
-function renderTimeline(el: HTMLElement, report: Report): void {
-  const box = card(el, t("timeline"));
+function renderTimeline(box: HTMLElement, report: Report): void {
+  box.empty();
   if (report.timeline.length === 0) {
-    emptyHint(box);
+    box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
     return;
   }
 
