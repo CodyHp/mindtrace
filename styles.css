@@ -235,6 +235,26 @@
   padding-top: 10px;
 }
 
+/* ---------- 今日总结（自然语言洞察） ---------- */
+.mindtrace-insight-summary {
+  font-size: 0.95em;
+  line-height: 1.6;
+  color: var(--text-normal);
+  margin-bottom: 10px;
+}
+
+.mindtrace-insight-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.88em;
+  line-height: 1.7;
+}
+
+.mindtrace-insight-list li {
+  margin: 2px 0;
+}
+
 /* ---------- 活跃日历 ---------- */
 .mindtrace-calendar-stats {
   display: flex;

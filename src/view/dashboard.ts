@@ -4,7 +4,7 @@ import { CalendarComponent, GridComponent, LegendComponent, TooltipComponent, Vi
 import { CanvasRenderer } from "echarts/renderers";
 import { FolderNode, Report, RevisitMode } from "../report/aggregate";
 import { UNCATEGORIZED } from "../report/classify";
-import { calendarDayLabels, t, weekdayLabels } from "../i18n";
+import { calendarDayLabels, getLocale, t, weekdayLabels } from "../i18n";
 import { localDay } from "../utils";
 
 echarts.use([
@@ -350,6 +350,12 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
   } catch (e) {
     console.error("MindTrace render failed:", e);
   }
+  try {
+    const insights = ensureBlock(el, "insights", t("insightsTitle"));
+    renderInsights(insights, report);
+  } catch (e) {
+    console.error("MindTrace render failed:", e);
+  }
 
   // 无数据：显示引导提示，隐藏图表块
   if (report.totalSeconds === 0) {
@@ -459,6 +465,100 @@ function renderToday(box: HTMLElement, report: Report): void {
   } else {
     box.createEl("div", { cls: "mindtrace-empty", text: t("todayEmpty") });
   }
+}
+
+// ---------- 今日总结（自然语言洞察） ----------
+function renderInsights(box: HTMLElement, report: Report): void {
+  box.empty();
+  const zh = getLocale() === "zh-CN";
+
+  // 无任何今日数据时只显示空态引导
+  if (report.today.activeSeconds === 0 && report.today.addedChars === 0) {
+    box.createEl("div", { cls: "mindtrace-insight-summary", text: t("todayEmpty") });
+    return;
+  }
+
+  // 今日一句：片段按数据有无动态拼接
+  const parts: string[] = [];
+  if (report.today.activeSeconds > 0) {
+    parts.push(t("summaryActive", { active: fmtDuration(report.today.activeSeconds) }));
+  }
+  if (report.today.addedChars > 0) {
+    parts.push(t("summaryChars", { chars: report.today.addedChars }));
+  }
+  if (report.today.topFolders.length > 0) {
+    parts.push(t("summaryTopic", { topic: displayFolder(report.today.topFolders[0].folder) }));
+  }
+  if (parts.length > 0) {
+    let line = t("summaryPrefix") + parts.join(zh ? "，" : ", ") + (zh ? "。" : ".");
+    if (report.streak > 0) line += " " + t("summaryStreak", { n: report.streak });
+    box.createEl("div", { cls: "mindtrace-insight-summary", text: line });
+  }
+
+  // 静态洞察列表
+  const insights: string[] = [];
+  if (report.folderBars.length > 0) {
+    const top = report.folderBars[0];
+    insights.push(t("insightTopTopic", { topic: displayFolder(top.folder), dur: fmtDuration(top.seconds) }));
+  }
+  const peak = peakHour(report);
+  if (peak !== null) insights.push(t("insightPeakHour", { hour: peak }));
+  const wd = topWeekday(report);
+  if (wd !== null) insights.push(t("insightTopWeekday", { weekday: weekdayLabels()[wd] }));
+  if (report.bestStreak >= 2) insights.push(t("insightBestStreak", { n: report.bestStreak }));
+  const wc = topWeekCompare(report);
+  if (wc) {
+    insights.push(
+      t(wc.more ? "insightWeekMore" : "insightWeekLess", {
+        topic: displayFolder(wc.folder),
+        this: fmtDuration(wc.thisWeek),
+        delta: fmtDuration(Math.abs(wc.delta)),
+      }),
+    );
+  }
+
+  if (insights.length > 0) {
+    const list = box.createEl("ul", { cls: "mindtrace-insight-list" });
+    for (const s of insights.slice(0, 6)) list.createEl("li", { text: s });
+  }
+}
+
+function peakHour(report: Report): number | null {
+  let bestHour: number | null = null;
+  let bestSec = 0;
+  for (const b of report.writePeak) {
+    const secs = b.readSeconds + b.writeSeconds;
+    if (secs > bestSec) {
+      bestSec = secs;
+      bestHour = b.hour;
+    }
+  }
+  return bestSec > 0 ? bestHour : null;
+}
+
+function topWeekday(report: Report): number | null {
+  let best: number | null = null;
+  let bestSec = 0;
+  for (const w of report.weekday) {
+    if (w.seconds > bestSec) {
+      bestSec = w.seconds;
+      best = w.weekday;
+    }
+  }
+  return bestSec > 0 ? best : null;
+}
+
+function topWeekCompare(report: Report): { folder: string; thisWeek: number; delta: number; more: boolean } | null {
+  let best: { folder: string; thisWeek: number; delta: number; more: boolean } | null = null;
+  let bestDelta = 0;
+  for (const w of report.weekCompare) {
+    const delta = w.thisWeek - w.lastWeek;
+    if (Math.abs(delta) > bestDelta) {
+      bestDelta = Math.abs(delta);
+      best = { folder: w.folder, thisWeek: w.thisWeek, delta, more: delta > 0 };
+    }
+  }
+  return bestDelta > 0 ? best : null;
 }
 
 function renderMatrix(box: HTMLElement, report: Report, theme: ThemeVars): void {
