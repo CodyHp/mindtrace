@@ -229,10 +229,12 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
   safe(() => renderDocActivity(el, report));
   safe(() => renderWeekCompare(el, report));
   safe(() => renderWeekday(el, report));
+  safe(() => renderWeekdayHour(el, report));
   safe(() => renderFlow(el, report));
   safe(() => renderDocGrowth(el, report));
   safe(() => renderReadWrite(el, report));
   safe(() => renderWordTrend(el, report));
+  safe(() => renderDocPerformance(el, report));
   safe(() => renderDocs(el, report, openFile));
   safe(() => renderTimeline(el, report));
 }
@@ -346,7 +348,7 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
   const toolbar = box.createEl("div", { cls: "mindtrace-toolbar" });
   const pathLabel = toolbar.createEl("span", { cls: "mindtrace-path", text: t("all") });
   const backBtn = toolbar.createEl("button", { text: t("backUp"), cls: "mindtrace-back" });
-  backBtn.style.display = "none";
+  backBtn.addClass("mindtrace-hidden");
 
   const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
@@ -377,7 +379,8 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
         draw();
       }
     });
-    backBtn.style.display = stack.length > 1 ? "" : "none";
+    if (stack.length > 1) backBtn.removeClass("mindtrace-hidden");
+    else backBtn.addClass("mindtrace-hidden");
   };
 
   addExportActions(box, chart, tree, "topic-ranking");
@@ -557,6 +560,50 @@ function renderWeekday(el: HTMLElement, report: Report): void {
   addExportActions(box, chart, report.weekday, "weekday-distribution");
 }
 
+function renderWeekdayHour(el: HTMLElement, report: Report): void {
+  const box = card(el, t("weekdayHour"));
+  const theme = readTheme();
+  const labels = weekdayLabels();
+  const maxSec = Math.max(1, ...report.weekdayHour.map((c) => c.seconds));
+
+  const cellMap = new Map<string, number>();
+  for (const c of report.weekdayHour) cellMap.set(`${c.weekday}|${c.hour}`, c.seconds);
+
+  const data: [number, number, number][] = [];
+  for (let wd = 0; wd < 7; wd++) {
+    for (let h = 0; h < 24; h++) {
+      const secs = cellMap.get(`${wd}|${h}`) ?? 0;
+      if (secs > 0) data.push([h, wd, secs]);
+    }
+  }
+
+  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
+  const chart = initChart(div);
+  chart.setOption({
+    tooltip: {
+      ...baseTooltip(theme),
+      position: "top",
+      formatter: (p: { value: [number, number, number] }) =>
+        `${labels[p.value[1]]} · ${p.value[0]}:00-${p.value[0] + 1}:00 · ${fmtDuration(p.value[2])}`,
+    },
+    grid: { left: 90, right: 20, top: 10, bottom: 55 },
+    xAxis: { type: "category", data: Array.from({ length: 24 }, (_, i) => `${i}`), splitArea: { show: true }, ...axisCommon(theme) },
+    yAxis: { type: "category", data: labels, splitArea: { show: true }, ...axisCommon(theme) },
+    visualMap: {
+      min: 0,
+      max: maxSec,
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 0,
+      inRange: { color: [mixHex(theme.accent, theme.bg, 0.9), theme.accent] },
+      textStyle: { color: theme.textMuted },
+    },
+    series: [{ type: "heatmap", data, emphasis: { itemStyle: { borderColor: theme.textNormal, borderWidth: 1 } } }],
+  } as any);
+  addExportActions(box, chart, report.weekdayHour, "weekday-hour");
+}
+
 function renderFlow(el: HTMLElement, report: Report): void {
   const box = card(el, t("attentionFlow"));
   const theme = readTheme();
@@ -693,14 +740,39 @@ function renderWordTrend(el: HTMLElement, report: Report): void {
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis" },
-    grid: { left: 60, right: 20, top: 16, bottom: 30 },
+    legend: { data: [t("added"), t("deleted"), t("net")], top: 0, textStyle: { color: theme.textMuted } },
+    grid: { left: 60, right: 20, top: 34, bottom: 30 },
     xAxis: { type: "category", data: days.map((d) => d.day), ...axisCommon(theme) },
-    yAxis: { type: "value", name: t("addedChars"), nameTextStyle: { color: theme.textFaint }, ...axisCommon(theme) },
+    yAxis: { type: "value", ...axisCommon(theme) },
     series: [
-      { name: t("addedChars"), type: "line", data: days.map((d) => d.addedChars), lineStyle: { color: theme.accent }, itemStyle: { color: theme.accent }, areaStyle: { color: mixHex(theme.accent, theme.bg, 0.85) }, symbolSize: 6 },
+      { name: t("added"), type: "bar", data: days.map((d) => d.addedChars), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.35), borderRadius: [2, 2, 0, 0] } },
+      { name: t("deleted"), type: "bar", data: days.map((d) => -d.deletedChars), itemStyle: { color: "#dc8250", borderRadius: [0, 0, 2, 2] } },
+      { name: t("net"), type: "line", data: days.map((d) => d.netChars), lineStyle: { color: theme.accent }, itemStyle: { color: theme.accent }, symbolSize: 6 },
     ],
   } as any);
   addExportActions(box, chart, report.wordTrend, "word-trend");
+}
+
+function renderDocPerformance(el: HTMLElement, report: Report): void {
+  const box = card(el, t("docPerformance"));
+  if (report.docPerformance.length === 0) {
+    emptyHint(box);
+    return;
+  }
+  const table = box.createEl("table", { cls: "mindtrace-table" });
+  const head = table.createEl("thead").createEl("tr");
+  head.createEl("th", { text: t("note") });
+  head.createEl("th", { text: t("views") });
+  head.createEl("th", { text: t("duration") });
+  head.createEl("th", { text: t("addedChars") });
+  const body = table.createEl("tbody");
+  for (const d of report.docPerformance.slice(0, 10)) {
+    const tr = body.createEl("tr");
+    tr.createEl("td", { text: d.notePath });
+    tr.createEl("td", { text: String(d.views) });
+    tr.createEl("td", { text: fmtDuration(d.activeSeconds) });
+    tr.createEl("td", { text: `+${d.addedChars}` });
+  }
 }
 
 function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
@@ -729,8 +801,7 @@ function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) =
       const row = revisitBox.createEl("div", { cls: "mindtrace-doc-row" });
       docLink(row, d.notePath, openFile);
       const tag = row.createEl("span", { cls: "mindtrace-tag", text: modeLabel(d.mode) });
-      tag.style.color = modeColor(d.mode, theme);
-      tag.style.borderColor = modeColor(d.mode, theme);
+      tag.setCssProps({ "--tag-color": modeColor(d.mode, theme) });
     }
   }
 }
@@ -784,7 +855,7 @@ function renderTimeline(el: HTMLElement, report: Report): void {
   renderRows();
 
   const toggle = box.createEl("button", { cls: "mindtrace-back", text: t("expandAll") });
-  toggle.style.marginTop = "8px";
+  toggle.addClass("mindtrace-mt8");
   toggle.onclick = (): void => {
     expanded = !expanded;
     toggle.textContent = expanded ? t("collapse") : t("expandAll");

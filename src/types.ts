@@ -33,6 +33,10 @@ export interface EditEvent {
   charDelta: number;
   /** 本次净增词数（英文按空格分词） */
   wordDelta: number;
+  /** 本次新增字符数（缺省时用 max(0, charDelta) 近似） */
+  addedChars?: number;
+  /** 本次删除字符数（缺省时用 max(0, -charDelta) 近似） */
+  deletedChars?: number;
 }
 
 export type TrackedEvent = SessionEvent | EditEvent;

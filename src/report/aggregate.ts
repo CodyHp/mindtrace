@@ -34,12 +34,22 @@ export interface ReadWriteDay {
 export interface WordTrendDay {
   day: string;
   addedChars: number;
+  deletedChars: number;
+  netChars: number;
   totalChars: number;
 }
 
 export interface DocFrequency {
   notePath: string;
   count: number;
+  lastTs: number;
+}
+
+export interface DocPerformance {
+  notePath: string;
+  views: number;
+  activeSeconds: number;
+  addedChars: number;
   lastTs: number;
 }
 
@@ -95,6 +105,12 @@ export interface WeekdayBucket {
   seconds: number;
 }
 
+export interface WeekdayHourCell {
+  weekday: number;
+  hour: number;
+  seconds: number;
+}
+
 export interface DocGrowth {
   notePath: string;
   points: { ts: number; cumulative: number }[];
@@ -124,6 +140,7 @@ export interface Report {
   readWriteByDay: ReadWriteDay[];
   wordTrend: WordTrendDay[];
   frequentDocs: DocFrequency[];
+  docPerformance: DocPerformance[];
   forgottenDocs: DocFrequency[];
   timeline: TimelineItem[];
   totalSeconds: number;
@@ -136,6 +153,7 @@ export interface Report {
   streak: number;
   revisit: RevisitDoc[];
   weekday: WeekdayBucket[];
+  weekdayHour: WeekdayHourCell[];
   docGrowth: DocGrowth[];
   flow: FlowLink[];
   dailyActive: DailyActive[];
@@ -218,16 +236,17 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     .sort((a, b) => a.day.localeCompare(b.day));
 
   // 4. 字数趋势（按天）
-  const wordMap = new Map<string, { added: number; total: number; totalTs: number }>();
+  const wordMap = new Map<string, { added: number; deleted: number; total: number; totalTs: number }>();
   for (const e of edits) {
     const day = localDay(e.ts);
-    const cur = wordMap.get(day) ?? { added: 0, total: 0, totalTs: 0 };
-    cur.added += e.charDelta;
+    const cur = wordMap.get(day) ?? { added: 0, deleted: 0, total: 0, totalTs: 0 };
+    cur.added += e.addedChars ?? Math.max(0, e.charDelta);
+    cur.deleted += e.deletedChars ?? Math.max(0, -e.charDelta);
     wordMap.set(day, cur);
   }
   for (const p of processed) {
     const day = localDay(p.session.ts);
-    const cur = wordMap.get(day) ?? { added: 0, total: 0, totalTs: 0 };
+    const cur = wordMap.get(day) ?? { added: 0, deleted: 0, total: 0, totalTs: 0 };
     if (p.session.ts >= cur.totalTs) {
       cur.totalTs = p.session.ts;
       cur.total = p.session.totalChars;
@@ -235,7 +254,13 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     wordMap.set(day, cur);
   }
   const wordTrend: WordTrendDay[] = [...wordMap.entries()]
-    .map(([day, v]) => ({ day, addedChars: v.added, totalChars: v.total }))
+    .map(([day, v]) => ({
+      day,
+      addedChars: v.added,
+      deletedChars: v.deleted,
+      netChars: v.added - v.deleted,
+      totalChars: v.total,
+    }))
     .sort((a, b) => a.day.localeCompare(b.day));
 
   // 5 / 6. 文档频率 + 遗忘 + 复访模式
@@ -274,6 +299,23 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     }
   }
   revisit.sort((a, b) => b.count - a.count);
+
+  // 6.5 文档表现（热门 / 趋势）
+  const docPerfAdded = new Map<string, number>();
+  for (const e of edits) {
+    const added = e.addedChars ?? Math.max(0, e.charDelta);
+    docPerfAdded.set(e.notePath, (docPerfAdded.get(e.notePath) ?? 0) + added);
+  }
+  const docPerformance: DocPerformance[] = [...docMap.entries()]
+    .map(([notePath, v]) => ({
+      notePath,
+      views: v.count,
+      activeSeconds: Math.round(v.totalSeconds),
+      addedChars: docPerfAdded.get(notePath) ?? 0,
+      lastTs: v.lastTs,
+    }))
+    .sort((a, b) => b.activeSeconds - a.activeSeconds)
+    .slice(0, 20);
 
   // 7. 明细时间线
   const timeline: TimelineItem[] = processed
@@ -400,6 +442,19 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     seconds: Math.round(weekdayMap.get(i) ?? 0),
   }));
 
+  // 12.5 星期 × 小时热力图
+  const weekdayHourMap = new Map<string, number>();
+  for (const p of processed) {
+    const split = sessionWeekdayHourSplit(p.session);
+    for (const [key, secs] of split) {
+      weekdayHourMap.set(key, (weekdayHourMap.get(key) ?? 0) + secs);
+    }
+  }
+  const weekdayHour: WeekdayHourCell[] = [...weekdayHourMap.entries()].map(([k, v]) => {
+    const idx = k.indexOf("|");
+    return { weekday: Number(k.slice(0, idx)), hour: Number(k.slice(idx + 1)), seconds: Math.round(v) };
+  });
+
   // 13. 单篇字数增长（top 高频文档的累计新增字数曲线）
   const growthMap = new Map<string, { ts: number; cumulative: number }[]>();
   for (const e of edits) {
@@ -438,6 +493,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     readWriteByDay,
     wordTrend,
     frequentDocs,
+    docPerformance,
     forgottenDocs,
     timeline,
     totalSeconds,
@@ -450,6 +506,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     streak,
     revisit: revisit.slice(0, 10),
     weekday,
+    weekdayHour,
     docGrowth,
     flow,
     dailyActive,
@@ -482,6 +539,28 @@ function sessionHourSplit(session: SessionEvent): Map<number, number> {
     const split = splitByHour(start, (end - start) / 1000);
     for (const [hour, secs] of split) {
       result.set(hour, (result.get(hour) ?? 0) + secs);
+    }
+  }
+  return result;
+}
+
+/** 按「星期 × 小时」切分 session 的活跃段，key 为 "weekday|hour" */
+function sessionWeekdayHourSplit(session: SessionEvent): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const [start, end] of sessionSegments(session)) {
+    let cur = start;
+    while (cur < end) {
+      const d = new Date(cur);
+      const weekday = (d.getDay() + 6) % 7; // 周一=0
+      const hour = d.getHours();
+      const next = new Date(d);
+      next.setMinutes(0, 0, 0);
+      next.setHours(next.getHours() + 1);
+      const segEnd = Math.min(next.getTime(), end);
+      const secs = (segEnd - cur) / 1000;
+      const key = `${weekday}|${hour}`;
+      result.set(key, (result.get(key) ?? 0) + secs);
+      cur = segEnd;
     }
   }
   return result;

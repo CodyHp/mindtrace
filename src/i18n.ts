@@ -51,8 +51,13 @@ const messages: Record<Locale, Record<string, string>> = {
     readWriteByDay: "阅读 vs 写作（按天）",
     wordTrend: "字数趋势（新增字符）",
     addedChars: "新增字符",
+    added: "新增",
+    deleted: "删除",
+    net: "净增",
 
     docProfile: "文档画像",
+    docPerformance: "文档表现",
+    views: "打开次数",
     forgotten: "遗忘提醒（最久没看）",
     revisitMode: "复访模式",
     deep: "深耕型",
@@ -66,6 +71,7 @@ const messages: Record<Locale, Record<string, string>> = {
     switchCount: "切换 {n} 次",
 
     weekdayDist: "星期分布",
+    weekdayHour: "星期 × 小时",
 
     timeline: "明细时间线",
     time: "时间",
@@ -162,8 +168,13 @@ const messages: Record<Locale, Record<string, string>> = {
     readWriteByDay: "Read vs Write (daily)",
     wordTrend: "Word Trend (added chars)",
     addedChars: "Added chars",
+    added: "Added",
+    deleted: "Deleted",
+    net: "Net",
 
     docProfile: "Document Profile",
+    docPerformance: "Content Performance",
+    views: "Views",
     forgotten: "Forgotten (least viewed)",
     revisitMode: "Revisit Pattern",
     deep: "Deep focus",
@@ -177,6 +188,7 @@ const messages: Record<Locale, Record<string, string>> = {
     switchCount: "{n} switches",
 
     weekdayDist: "Weekday Distribution",
+    weekdayHour: "Weekday × Hour",
 
     timeline: "Timeline",
     time: "Time",

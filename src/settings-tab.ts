@@ -10,7 +10,7 @@ export class MindTraceSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: t("settingsTitle") });
+    new Setting(containerEl).setHeading().setName(t("settingsTitle"));
 
     new Setting(containerEl)
       .setName(t("dataDir"))

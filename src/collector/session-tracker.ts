@@ -86,11 +86,15 @@ export class SessionTracker {
 
       let charDelta = 0;
       let wordDelta = 0;
+      let addedChars = 0;
+      let deletedChars = 0;
       update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
         const removed = update.startState.doc.sliceString(fromA, toA);
         const ins = inserted.toString();
         charDelta += countChars(ins) - countChars(removed);
         wordDelta += countWords(ins) - countWords(removed);
+        addedChars += countChars(ins);
+        deletedChars += countChars(removed);
       });
 
       const now = Date.now();
@@ -105,6 +109,8 @@ export class SessionTracker {
         notePath: view.file.path,
         charDelta,
         wordDelta,
+        addedChars,
+        deletedChars,
       });
     });
   }
