@@ -1,9 +1,9 @@
 {
   "id": "mindtrace",
   "name": "MindTrace",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "minAppVersion": "1.7.2",
-  "description": "Local-first attention analytics: automatically track time spent and writing on each note, then visualize how your attention flows across topics and hours.",
+  "description": "Local-first time & attention tracker: automatically track reading and writing time on each note, then visualize how your attention flows across topics, hours, and weekdays.",
   "author": "yinxuhao",
   "authorUrl": "https://github.com/CodyHp",
   "isDesktopOnly": false

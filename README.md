@@ -13,6 +13,8 @@ A silent, local-first **time & attention tracker** for Obsidian — a beautiful 
 
 ---
 
+**MindTrace（注意力 / 时间追踪）** 是一款本地优先的 Obsidian 插件：它静默记录你在每篇笔记上的阅读与写作时长，按「主题 × 时间」还原你的注意力流向——一眼看清「早晨属于哲学，下午属于代码」，并用自然语言总结你的习惯。数据全部留在本地，永不上传。
+
 ## ✨ The one chart that explains your day
 
 MindTrace is a zero-friction **time tracker and attention analytics** plugin. It runs in the background and quietly records how long you spend on each note — reading and writing — then rolls everything up by **folder** and plots it as a **topic × time heatmap**. One glance, and you can see "mornings are for philosophy, afternoons for code."
