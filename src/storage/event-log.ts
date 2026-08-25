@@ -1,5 +1,5 @@
 import { App, normalizePath } from "obsidian";
-import { ObsTrackerSettings, TrackedEvent } from "../types";
+import { MindTraceSettings, TrackedEvent } from "../types";
 import { localDay } from "../utils";
 
 /**
@@ -12,7 +12,7 @@ export class EventLog {
   private flushTimer: number | null = null;
   private flushPromise: Promise<void> | null = null;
 
-  constructor(private app: App, private settings: ObsTrackerSettings) {}
+  constructor(private app: App, private settings: MindTraceSettings) {}
 
   append(ev: TrackedEvent, immediate = false): void {
     this.buffer.push(ev);
@@ -66,7 +66,7 @@ export class EventLog {
         }
       }
     } catch (e) {
-      console.error("ObsTracker 写盘失败，事件已回滚待重试：", e);
+      console.error("MindTrace 写盘失败，事件已回滚待重试：", e);
       this.buffer.unshift(...events);
     }
   }

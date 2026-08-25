@@ -75,7 +75,7 @@ const messages: Record<Locale, Record<string, string>> = {
     expandAll: "展开全部",
     collapse: "收起",
 
-    settingsTitle: "ObsTracker 设置",
+    settingsTitle: "MindTrace 设置",
     dataDir: "数据目录",
     dataDirDesc: "事件数据存放目录（相对 vault 根）。修改后新数据写入新目录，旧数据保留在原处。",
     dashboardPath: "看板笔记路径",
@@ -108,9 +108,9 @@ const messages: Record<Locale, Record<string, string>> = {
     colorTeal: "青",
     language: "语言",
     languageDesc: "界面显示语言。",
-    openDashboard: "打开 ObsTracker 看板",
+    openDashboard: "打开 MindTrace 看板",
     openDashboardCmd: "打开看板",
-    aboutData: "数据存放于 vault 根的 `.obstracker/` 目录，纯本地、不上传。",
+    aboutData: "数据存放于 vault 根的 `.mindtrace/` 目录，纯本地、不上传。",
   },
   en: {
     loading: "Loading…",
@@ -186,7 +186,7 @@ const messages: Record<Locale, Record<string, string>> = {
     expandAll: "Expand all",
     collapse: "Collapse",
 
-    settingsTitle: "ObsTracker Settings",
+    settingsTitle: "MindTrace Settings",
     dataDir: "Data directory",
     dataDirDesc: "Directory for event data (relative to vault root). Changing it writes new data to the new directory.",
     dashboardPath: "Dashboard note path",
@@ -219,9 +219,9 @@ const messages: Record<Locale, Record<string, string>> = {
     colorTeal: "Teal",
     language: "Language",
     languageDesc: "Interface display language.",
-    openDashboard: "Open ObsTracker dashboard",
+    openDashboard: "Open MindTrace dashboard",
     openDashboardCmd: "Open dashboard",
-    aboutData: "Data lives in the `.obstracker/` folder at your vault root — fully local, never uploaded.",
+    aboutData: "Data lives in the `.mindtrace/` folder at your vault root — fully local, never uploaded.",
   },
 };
 

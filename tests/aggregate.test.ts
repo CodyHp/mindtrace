@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildReport } from "../src/report/aggregate";
 import { DEFAULT_SETTINGS } from "../src/settings";
-import { EditEvent, ObsTrackerSettings, SessionEvent } from "../src/types";
+import { EditEvent, MindTraceSettings, SessionEvent } from "../src/types";
 
-const settings: ObsTrackerSettings = { ...DEFAULT_SETTINGS };
+const settings: MindTraceSettings = { ...DEFAULT_SETTINGS };
 
 function makeSession(overrides: Partial<SessionEvent> = {}): SessionEvent {
   return {

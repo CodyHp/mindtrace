@@ -1,5 +1,5 @@
 {
-  "name": "obstracker",
+  "name": "mindtrace",
   "version": "1.0.0",
   "description": "Local-first attention analytics for Obsidian: track time and writing per note, visualized by topic and time.",
   "main": "main.js",

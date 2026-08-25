@@ -1,4 +1,4 @@
-import { EditEvent, ObsTrackerSettings, SessionEvent, TrackedEvent } from "../types";
+import { EditEvent, MindTraceSettings, SessionEvent, TrackedEvent } from "../types";
 import { UNCATEGORIZED, folderLevels } from "./classify";
 import { classifyReadWrite } from "./readwrite";
 import { localDay, localHour } from "../utils";
@@ -148,7 +148,7 @@ export interface Report {
 }
 
 /** 从原始事件流构建完整报表数据 */
-export function buildReport(events: TrackedEvent[], settings: ObsTrackerSettings): Report {
+export function buildReport(events: TrackedEvent[], settings: MindTraceSettings): Report {
   const sessions = events.filter((e): e is SessionEvent => e.type === "session");
   const edits = events.filter((e): e is EditEvent => e.type === "edit");
 

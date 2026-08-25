@@ -3,18 +3,18 @@ import { SessionTracker } from "./collector/session-tracker";
 import { buildReport } from "./report/aggregate";
 import { loadEvents } from "./report/loader";
 import { DEFAULT_SETTINGS } from "./settings";
-import { ObsTrackerSettingTab } from "./settings-tab";
+import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
 import { Locale, setLocale, t } from "./i18n";
-import { ObsTrackerSettings } from "./types";
+import { MindTraceSettings } from "./types";
 import { renderReport, setColorTheme as applyColorTheme } from "./view/dashboard";
 
 function dashboardTemplate(): string {
-  return "\n```obstracker\n```\n";
+  return "\n```mindtrace\n```\n";
 }
 
-export default class ObsTrackerPlugin extends Plugin {
-  settings: ObsTrackerSettings = DEFAULT_SETTINGS;
+export default class MindTracePlugin extends Plugin {
+  settings: MindTraceSettings = DEFAULT_SETTINGS;
   private eventLog: EventLog | null = null;
   private sessionTracker: SessionTracker | null = null;
   private renderedBlocks = new Set<HTMLElement>();
@@ -48,11 +48,11 @@ export default class ObsTrackerPlugin extends Plugin {
       },
     });
 
-    this.registerMarkdownCodeBlockProcessor("obstracker", (_source, el) => {
+    this.registerMarkdownCodeBlockProcessor("mindtrace", (_source, el) => {
       void this.renderCodeBlock(el);
     });
 
-    this.addSettingTab(new ObsTrackerSettingTab(this.app, this));
+    this.addSettingTab(new MindTraceSettingTab(this.app, this));
   }
 
   async onunload(): Promise<void> {
@@ -101,7 +101,7 @@ export default class ObsTrackerPlugin extends Plugin {
 
   async renderCodeBlock(el: HTMLElement): Promise<void> {
     this.renderedBlocks.add(el);
-    const loading = el.createEl("div", { cls: "obstracker-loading", text: t("loading") });
+    const loading = el.createEl("div", { cls: "mindtrace-loading", text: t("loading") });
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
       const report = buildReport(events, this.settings);

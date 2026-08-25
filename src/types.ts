@@ -36,7 +36,7 @@ export interface EditEvent {
 export type TrackedEvent = SessionEvent | EditEvent;
 
 /** 插件设置 */
-export interface ObsTrackerSettings {
+export interface MindTraceSettings {
   /** 数据目录（相对 vault 根） */
   dataDir: string;
   /** 心跳间隔（秒，仅内存） */

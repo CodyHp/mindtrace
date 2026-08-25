@@ -1,9 +1,9 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import { t } from "./i18n";
-import type ObsTrackerPlugin from "./main";
+import type MindTracePlugin from "./main";
 
-export class ObsTrackerSettingTab extends PluginSettingTab {
-  constructor(app: App, private plugin: ObsTrackerPlugin) {
+export class MindTraceSettingTab extends PluginSettingTab {
+  constructor(app: App, private plugin: MindTracePlugin) {
     super(app, plugin);
   }
 
@@ -17,10 +17,10 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
       .setDesc(t("dataDirDesc"))
       .addText((text) =>
         text
-          .setPlaceholder(".obstracker")
+          .setPlaceholder(".mindtrace")
           .setValue(this.plugin.settings.dataDir)
           .onChange(async (value) => {
-            this.plugin.settings.dataDir = value.trim() || ".obstracker";
+            this.plugin.settings.dataDir = value.trim() || ".mindtrace";
             await this.plugin.saveSettings();
           }),
       );
@@ -30,10 +30,10 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
       .setDesc(t("dashboardPathDesc"))
       .addText((text) =>
         text
-          .setPlaceholder("ObsTracker.md")
+          .setPlaceholder("MindTrace.md")
           .setValue(this.plugin.settings.dashboardPath)
           .onChange(async (value) => {
-            this.plugin.settings.dashboardPath = value.trim() || "ObsTracker.md";
+            this.plugin.settings.dashboardPath = value.trim() || "MindTrace.md";
             await this.plugin.saveSettings();
           }),
       );
@@ -103,7 +103,7 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
       .setDesc(t("excludeDesc"))
       .addTextArea((ta) =>
         ta
-          .setPlaceholder(".obstracker\n.obsidian")
+          .setPlaceholder(".mindtrace\n.obsidian")
           .setValue(this.plugin.settings.excludePaths.join("\n"))
           .onChange(async (value) => {
             this.plugin.settings.excludePaths = value
@@ -114,7 +114,7 @@ export class ObsTrackerSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("div", { cls: "obstracker-about", text: t("aboutData") });
+    containerEl.createEl("div", { cls: "mindtrace-about", text: t("aboutData") });
   }
 
   private addNumber(

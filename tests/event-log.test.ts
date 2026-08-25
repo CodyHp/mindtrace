@@ -57,7 +57,7 @@ describe("EventLog", () => {
     log.append(session(Date.now()), true);
     await log.flush();
     const path = [...adapter.files.keys()][0];
-    expect(path).toContain(".obstracker/events-");
+    expect(path).toContain(".mindtrace/events-");
     expect(adapter.files.get(path)).toContain('"type":"session"');
   });
 
@@ -76,7 +76,7 @@ describe("EventLog", () => {
     await log.flush(); // 重试成功
 
     const path = [...adapter.files.keys()][0];
-    expect(path).toContain(".obstracker/events-");
+    expect(path).toContain(".mindtrace/events-");
     expect(adapter.files.get(path)).toContain('"type":"session"');
   });
 

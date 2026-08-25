@@ -1,14 +1,14 @@
-import { ObsTrackerSettings } from "./types";
+import { MindTraceSettings } from "./types";
 
-export const DEFAULT_SETTINGS: ObsTrackerSettings = {
-  dataDir: ".obstracker",
+export const DEFAULT_SETTINGS: MindTraceSettings = {
+  dataDir: ".mindtrace",
   heartbeatIntervalSec: 30,
   idleThresholdSec: 180,
   minSessionSec: 2,
   sliceSec: 300,
   writeCharThreshold: 20,
-  excludePaths: [".obstracker", ".obsidian"],
-  dashboardPath: "ObsTracker.md",
+  excludePaths: [".mindtrace", ".obsidian"],
+  dashboardPath: "MindTrace.md",
   colorTheme: "theme",
   language: "zh-CN",
 };

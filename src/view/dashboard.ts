@@ -127,7 +127,7 @@ function displayFolder(folder: string): string {
 }
 
 function card(el: HTMLElement, title: string): HTMLElement {
-  const box = el.createEl("div", { cls: "obstracker-card" });
+  const box = el.createEl("div", { cls: "mindtrace-card" });
   const h3 = box.createEl("h3");
   h3.createEl("span", { text: title });
   return box;
@@ -135,7 +135,7 @@ function card(el: HTMLElement, title: string): HTMLElement {
 
 function emptyHint(box: HTMLElement): void {
   box.createEl("div", {
-    cls: "obstracker-empty",
+    cls: "mindtrace-empty",
     text: t("empty"),
   });
 }
@@ -174,16 +174,16 @@ function toCsv(data: unknown): string | null {
 function addExportActions(box: HTMLElement, chart: Chart, data: unknown, name: string): void {
   const h3 = box.querySelector("h3");
   if (!h3) return;
-  const actions = h3.createEl("div", { cls: "obstracker-card-actions" });
+  const actions = h3.createEl("div", { cls: "mindtrace-card-actions" });
 
-  const pngBtn = actions.createEl("button", { cls: "obstracker-back", text: "PNG" });
+  const pngBtn = actions.createEl("button", { cls: "mindtrace-back", text: "PNG" });
   pngBtn.title = t("exportImage");
   pngBtn.onclick = (): void => {
     const url = chart.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "transparent" });
     downloadUrl(url, `${name}.png`);
   };
 
-  const jsonBtn = actions.createEl("button", { cls: "obstracker-back", text: "JSON" });
+  const jsonBtn = actions.createEl("button", { cls: "mindtrace-back", text: "JSON" });
   jsonBtn.title = t("exportData");
   jsonBtn.onclick = (): void => {
     downloadText(JSON.stringify(data, null, 2), `${name}.json`, "application/json");
@@ -191,7 +191,7 @@ function addExportActions(box: HTMLElement, chart: Chart, data: unknown, name: s
 
   const csv = toCsv(data);
   if (csv) {
-    const csvBtn = actions.createEl("button", { cls: "obstracker-back", text: "CSV" });
+    const csvBtn = actions.createEl("button", { cls: "mindtrace-back", text: "CSV" });
     csvBtn.title = t("exportCsv");
     csvBtn.onclick = (): void => {
       downloadText(csv, `${name}.csv`, "text/csv");
@@ -203,13 +203,13 @@ function addExportActions(box: HTMLElement, chart: Chart, data: unknown, name: s
 export function renderReport(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
   disposeCharts();
   el.empty();
-  el.addClass("obstracker-report");
+  el.addClass("mindtrace-report");
 
   const safe = (fn: () => void): void => {
     try {
       fn();
     } catch (e) {
-      console.error("ObsTracker render failed:", e);
+      console.error("MindTrace render failed:", e);
     }
   };
 
@@ -238,11 +238,11 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
 }
 
 function renderKpis(el: HTMLElement, report: Report): void {
-  const kpis = el.createEl("div", { cls: "obstracker-kpis" });
+  const kpis = el.createEl("div", { cls: "mindtrace-kpis" });
   const add = (label: string, value: string): void => {
-    const k = kpis.createEl("div", { cls: "obstracker-kpi" });
-    k.createEl("div", { cls: "obstracker-kpi-value", text: value });
-    k.createEl("div", { cls: "obstracker-kpi-label", text: label });
+    const k = kpis.createEl("div", { cls: "mindtrace-kpi" });
+    k.createEl("div", { cls: "mindtrace-kpi-value", text: value });
+    k.createEl("div", { cls: "mindtrace-kpi-label", text: label });
   };
   add(t("kpiToday"), fmtDuration(report.today.activeSeconds));
   add(t("kpiStreak"), t("days", { n: report.streak }));
@@ -254,23 +254,23 @@ function renderToday(el: HTMLElement, report: Report): void {
   const box = card(el, t("today"));
   const today = report.today;
 
-  const summary = box.createEl("div", { cls: "obstracker-today-summary" });
-  const active = summary.createEl("div", { cls: "obstracker-today-big" });
-  active.createEl("div", { cls: "obstracker-today-value", text: fmtDuration(today.activeSeconds) });
-  active.createEl("div", { cls: "obstracker-today-label", text: t("activeTime") });
-  const words = summary.createEl("div", { cls: "obstracker-today-big" });
-  words.createEl("div", { cls: "obstracker-today-value", text: t("chars", { n: today.addedChars }) });
-  words.createEl("div", { cls: "obstracker-today-label", text: t("todayWriting") });
+  const summary = box.createEl("div", { cls: "mindtrace-today-summary" });
+  const active = summary.createEl("div", { cls: "mindtrace-today-big" });
+  active.createEl("div", { cls: "mindtrace-today-value", text: fmtDuration(today.activeSeconds) });
+  active.createEl("div", { cls: "mindtrace-today-label", text: t("activeTime") });
+  const words = summary.createEl("div", { cls: "mindtrace-today-big" });
+  words.createEl("div", { cls: "mindtrace-today-value", text: t("chars", { n: today.addedChars }) });
+  words.createEl("div", { cls: "mindtrace-today-label", text: t("todayWriting") });
 
   if (today.topFolders.length > 0) {
-    const list = box.createEl("div", { cls: "obstracker-today-folders" });
+    const list = box.createEl("div", { cls: "mindtrace-today-folders" });
     for (const f of today.topFolders) {
-      const row = list.createEl("div", { cls: "obstracker-doc-row" });
-      row.createEl("span", { cls: "obstracker-doc-path", text: displayFolder(f.folder) });
-      row.createEl("span", { cls: "obstracker-doc-count", text: fmtDuration(f.seconds) });
+      const row = list.createEl("div", { cls: "mindtrace-doc-row" });
+      row.createEl("span", { cls: "mindtrace-doc-path", text: displayFolder(f.folder) });
+      row.createEl("span", { cls: "mindtrace-doc-count", text: fmtDuration(f.seconds) });
     }
   } else {
-    box.createEl("div", { cls: "obstracker-empty", text: t("todayEmpty") });
+    box.createEl("div", { cls: "mindtrace-empty", text: t("todayEmpty") });
   }
 }
 
@@ -301,7 +301,7 @@ function renderMatrix(el: HTMLElement, report: Report): void {
     }
   }
 
-  const div = box.createEl("div", { cls: "obstracker-chart obstracker-chart-tall" });
+  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: {
@@ -343,12 +343,12 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
 
   const stack: FolderNode[][] = [tree];
   const path: string[] = [];
-  const toolbar = box.createEl("div", { cls: "obstracker-toolbar" });
-  const pathLabel = toolbar.createEl("span", { cls: "obstracker-path", text: t("all") });
-  const backBtn = toolbar.createEl("button", { text: t("backUp"), cls: "obstracker-back" });
+  const toolbar = box.createEl("div", { cls: "mindtrace-toolbar" });
+  const pathLabel = toolbar.createEl("span", { cls: "mindtrace-path", text: t("all") });
+  const backBtn = toolbar.createEl("button", { text: t("backUp"), cls: "mindtrace-back" });
   backBtn.style.display = "none";
 
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
 
   const draw = (): void => {
@@ -397,7 +397,7 @@ function renderFolderBars(el: HTMLElement, tree: FolderNode[]): void {
 function renderWritePeak(el: HTMLElement, report: Report): void {
   const box = card(el, t("activeHours"));
   const theme = readTheme();
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
@@ -417,7 +417,7 @@ function renderCalendar(el: HTMLElement, report: Report): void {
   const box = card(el, t("activeCalendar"));
   const theme = readTheme();
 
-  const stats = box.createEl("div", { cls: "obstracker-calendar-stats" });
+  const stats = box.createEl("div", { cls: "mindtrace-calendar-stats" });
   stats.createEl("span", { text: `${t("currentStreak")} ${t("days", { n: report.streak })}` });
   stats.createEl("span", { text: `${t("longestStreak")} ${t("days", { n: report.bestStreak })}` });
 
@@ -431,7 +431,7 @@ function renderCalendar(el: HTMLElement, report: Report): void {
   const start = new Date(now);
   start.setDate(start.getDate() - 364); // 近一年
 
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: {
@@ -481,21 +481,21 @@ function renderDocActivity(el: HTMLElement, report: Report): void {
   ];
   let currentMode = 2; // 默认月
 
-  const switcher = box.createEl("div", { cls: "obstracker-doc-growth-switcher" });
+  const switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
   const buttons: HTMLElement[] = [];
   modes.forEach((m, i) => {
-    const btn = switcher.createEl("button", { cls: "obstracker-back", text: m.label });
+    const btn = switcher.createEl("button", { cls: "mindtrace-back", text: m.label });
     buttons.push(btn);
-    if (i === currentMode) btn.addClass("obstracker-active");
+    if (i === currentMode) btn.addClass("mindtrace-active");
     btn.onclick = (): void => {
       currentMode = i;
-      buttons.forEach((b) => b.removeClass("obstracker-active"));
-      btn.addClass("obstracker-active");
+      buttons.forEach((b) => b.removeClass("mindtrace-active"));
+      btn.addClass("mindtrace-active");
       draw();
     };
   });
 
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
 
   const draw = (): void => {
@@ -525,7 +525,7 @@ function renderWeekCompare(el: HTMLElement, report: Report): void {
     return;
   }
   const folders = report.weekCompare.map((w) => w.folder);
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: (v: number) => fmtDuration(v) },
@@ -545,7 +545,7 @@ function renderWeekday(el: HTMLElement, report: Report): void {
   const box = card(el, t("weekdayDist"));
   const theme = readTheme();
   const labels = weekdayLabels();
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
@@ -572,7 +572,7 @@ function renderFlow(el: HTMLElement, report: Report): void {
   }
   const maxDegree = Math.max(1, ...degree.values());
 
-  const div = box.createEl("div", { cls: "obstracker-chart obstracker-chart-tall" });
+  const div = box.createEl("div", { cls: "mindtrace-chart mindtrace-chart-tall" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: {
@@ -616,8 +616,8 @@ function renderDocGrowth(el: HTMLElement, report: Report): void {
     return;
   }
   let current = report.docGrowth[0];
-  const title = box.createEl("div", { cls: "obstracker-doc-growth-title", text: current.notePath });
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const title = box.createEl("div", { cls: "mindtrace-doc-growth-title", text: current.notePath });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
 
   const draw = (): void => {
@@ -641,20 +641,20 @@ function renderDocGrowth(el: HTMLElement, report: Report): void {
   draw();
   addExportActions(box, chart, report.docGrowth, "word-growth");
 
-  const switcher = box.createEl("div", { cls: "obstracker-doc-growth-switcher" });
+  const switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
   const buttons: HTMLElement[] = [];
   for (const d of report.docGrowth.slice(0, 6)) {
-    const btn = switcher.createEl("button", { cls: "obstracker-back", text: d.notePath.split("/").pop() ?? d.notePath });
+    const btn = switcher.createEl("button", { cls: "mindtrace-back", text: d.notePath.split("/").pop() ?? d.notePath });
     buttons.push(btn);
     btn.onclick = (): void => {
       current = d;
       title.textContent = d.notePath;
-      buttons.forEach((b) => b.removeClass("obstracker-active"));
-      btn.addClass("obstracker-active");
+      buttons.forEach((b) => b.removeClass("mindtrace-active"));
+      btn.addClass("mindtrace-active");
       draw();
     };
   }
-  if (buttons.length > 0) buttons[0].addClass("obstracker-active");
+  if (buttons.length > 0) buttons[0].addClass("mindtrace-active");
 }
 
 function renderReadWrite(el: HTMLElement, report: Report): void {
@@ -665,7 +665,7 @@ function renderReadWrite(el: HTMLElement, report: Report): void {
     return;
   }
   const days = report.readWriteByDay.slice(-14);
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
@@ -689,7 +689,7 @@ function renderWordTrend(el: HTMLElement, report: Report): void {
     return;
   }
   const days = report.wordTrend.slice(-14);
-  const div = box.createEl("div", { cls: "obstracker-chart" });
+  const div = box.createEl("div", { cls: "mindtrace-chart" });
   const chart = initChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis" },
@@ -706,7 +706,7 @@ function renderWordTrend(el: HTMLElement, report: Report): void {
 function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) => void): void {
   const box = card(el, t("docProfile"));
   const theme = readTheme();
-  const cols = box.createEl("div", { cls: "obstracker-doc-cols" });
+  const cols = box.createEl("div", { cls: "mindtrace-doc-cols" });
 
   const forgotBox = cols.createEl("div");
   forgotBox.createEl("h4", { text: t("forgotten") });
@@ -714,9 +714,9 @@ function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) =
     emptyHint(forgotBox);
   } else {
     for (const d of report.forgottenDocs.slice(0, 10)) {
-      const row = forgotBox.createEl("div", { cls: "obstracker-doc-row" });
+      const row = forgotBox.createEl("div", { cls: "mindtrace-doc-row" });
       docLink(row, d.notePath, openFile);
-      row.createEl("span", { cls: "obstracker-doc-count", text: lastText(d.lastTs) });
+      row.createEl("span", { cls: "mindtrace-doc-count", text: lastText(d.lastTs) });
     }
   }
 
@@ -726,9 +726,9 @@ function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) =
     emptyHint(revisitBox);
   } else {
     for (const d of report.revisit) {
-      const row = revisitBox.createEl("div", { cls: "obstracker-doc-row" });
+      const row = revisitBox.createEl("div", { cls: "mindtrace-doc-row" });
       docLink(row, d.notePath, openFile);
-      const tag = row.createEl("span", { cls: "obstracker-tag", text: modeLabel(d.mode) });
+      const tag = row.createEl("span", { cls: "mindtrace-tag", text: modeLabel(d.mode) });
       tag.style.color = modeColor(d.mode, theme);
       tag.style.borderColor = modeColor(d.mode, theme);
     }
@@ -736,7 +736,7 @@ function renderDocs(el: HTMLElement, report: Report, openFile?: (path: string) =
 }
 
 function docLink(parent: HTMLElement, notePath: string, openFile?: (path: string) => void): void {
-  const el = parent.createEl("span", { cls: "obstracker-doc-path obstracker-doc-link", text: notePath });
+  const el = parent.createEl("span", { cls: "mindtrace-doc-path mindtrace-doc-link", text: notePath });
   if (openFile) {
     el.onclick = (): void => openFile(notePath);
   }
@@ -762,7 +762,7 @@ function renderTimeline(el: HTMLElement, report: Report): void {
   }
 
   let expanded = false;
-  const table = box.createEl("table", { cls: "obstracker-table" });
+  const table = box.createEl("table", { cls: "mindtrace-table" });
   const head = table.createEl("thead").createEl("tr");
   head.createEl("th", { text: t("time") });
   head.createEl("th", { text: t("note") });
@@ -783,7 +783,7 @@ function renderTimeline(el: HTMLElement, report: Report): void {
   };
   renderRows();
 
-  const toggle = box.createEl("button", { cls: "obstracker-back", text: t("expandAll") });
+  const toggle = box.createEl("button", { cls: "mindtrace-back", text: t("expandAll") });
   toggle.style.marginTop = "8px";
   toggle.onclick = (): void => {
     expanded = !expanded;

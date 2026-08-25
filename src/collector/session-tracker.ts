@@ -2,7 +2,7 @@ import { App, MarkdownView, TFile } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { EventLog } from "../storage/event-log";
-import { NoteMode, ObsTrackerSettings, SessionEndReason } from "../types";
+import { NoteMode, MindTraceSettings, SessionEndReason } from "../types";
 import { countChars, countWords } from "../utils";
 
 interface ActiveSession {
@@ -35,7 +35,7 @@ export class SessionTracker {
   constructor(
     private app: App,
     private eventLog: EventLog,
-    private settings: ObsTrackerSettings,
+    private settings: MindTraceSettings,
   ) {}
 
   start(): void {
