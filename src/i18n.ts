@@ -1,0 +1,262 @@
+export type Locale = "zh-CN" | "en";
+
+const messages: Record<Locale, Record<string, string>> = {
+  "zh-CN": {
+    loading: "加载中…",
+    loadFailed: "加载失败：",
+    empty: "暂无数据。打开几篇笔记停留/滚动阅读片刻，数据会自动积累。",
+    never: "从未",
+    today: "今天",
+    uncategorized: "未分类",
+    yesterday: "昨天",
+    daysAgo: "{n} 天前",
+    monthsAgo: "{n} 个月前",
+    days: "{n} 天",
+    chars: "{n} 字",
+
+    kpiToday: "今日活跃",
+    kpiStreak: "连续天数",
+    kpiRead: "累计阅读",
+    kpiWrite: "累计写作",
+
+    activeTime: "活跃时长",
+    todayWriting: "今日写作",
+    todayEmpty: "今天还没有记录，去打开一篇笔记吧。",
+    startRecording: "开始记录",
+
+    timeByTopic: "时段 × 主题",
+    topicRanking: "主题时长排行",
+    all: "全部",
+    backUp: "← 返回上级",
+    activeHours: "活跃时段（阅读 / 写作）",
+    read: "阅读",
+    write: "写作",
+
+    activeCalendar: "活跃日历",
+    currentStreak: "当前连续",
+    longestStreak: "最长连续",
+
+    docActivity: "文档活跃度",
+    activeDocs: "活跃篇数",
+    writeDocs: "写作篇数",
+    day: "天",
+    week: "周",
+    month: "月",
+    quarter: "季度",
+    year: "年",
+
+    weekCompare: "本周 vs 上周",
+    thisWeek: "本周",
+    lastWeek: "上周",
+    readWriteByDay: "阅读 vs 写作（按天）",
+    wordTrend: "字数趋势（新增字符）",
+    addedChars: "新增字符",
+
+    docProfile: "文档画像",
+    forgotten: "遗忘提醒（最久没看）",
+    revisitMode: "复访模式",
+    deep: "深耕型",
+    review: "复习型",
+    stuck: "写不动型",
+
+    docGrowth: "单篇字数增长",
+    cumulativeChars: "累计字数",
+
+    attentionFlow: "主题注意力流向",
+    switchCount: "切换 {n} 次",
+
+    weekdayDist: "星期分布",
+
+    timeline: "明细时间线",
+    time: "时间",
+    note: "笔记",
+    duration: "时长",
+    readWrite: "读 / 写",
+    expandAll: "展开全部",
+    collapse: "收起",
+
+    settingsTitle: "ObsTracker 设置",
+    dataDir: "数据目录",
+    dataDirDesc: "事件数据存放目录（相对 vault 根）。修改后新数据写入新目录，旧数据保留在原处。",
+    dashboardPath: "看板笔记路径",
+    dashboardPathDesc: "「打开看板」命令会创建/打开这个笔记（相对 vault 根）。",
+    heartbeatInterval: "心跳间隔（秒）",
+    heartbeatDesc: "空闲检测的定时器间隔。修改后立即生效。",
+    idleThreshold: "空闲阈值（秒）",
+    idleDesc: "无交互多久视为空闲，该段不计入活跃时长。",
+    minSession: "最短会话（秒）",
+    minSessionDesc: "低于此时长的 session 丢弃，用于减噪。0 表示不丢弃。",
+    sliceSec: "弱推断分片（秒）",
+    sliceDesc: "读写弱推断的分片时长，默认 300（5 分钟）。",
+    writeThreshold: "写作字数阈值",
+    writeDesc: "一个分片内净增字符数达到该值即判为「写作」，否则「阅读」。0 表示任何编辑即写作。",
+    excludePaths: "排除路径",
+    excludeDesc: "每行一个前缀，这些路径下的文件不记录。",
+
+    exportImage: "导出图片",
+    exportData: "导出数据",
+    exportCsv: "导出 CSV",
+    colorTheme: "颜色主题",
+    colorThemeDesc: "看板图表的基础色。",
+    reloadHint: "重新打开看板即可看到效果。",
+    themeAuto: "跟随主题",
+    colorBlue: "蓝",
+    colorPurple: "紫",
+    colorGreen: "绿",
+    colorOrange: "橙",
+    colorPink: "粉",
+    colorTeal: "青",
+    language: "语言",
+    languageDesc: "界面显示语言。",
+    openDashboard: "打开 ObsTracker 看板",
+    openDashboardCmd: "打开看板",
+    dashboardHeading: "ObsTracker 看板",
+    dashboardHint: "此看板由 ObsTracker 自动维护，数据实时来自本地 `.obstracker/` 目录。本笔记可正常编辑、版本管理，也能被 Dataview 等其它插件读取。",
+  },
+  en: {
+    loading: "Loading…",
+    loadFailed: "Failed to load: ",
+    empty: "No data yet. Open some notes and stay a while — data accumulates automatically.",
+    never: "never",
+    today: "today",
+    uncategorized: "Uncategorized",
+    yesterday: "yesterday",
+    daysAgo: "{n}d ago",
+    monthsAgo: "{n}mo ago",
+    days: "{n} days",
+    chars: "{n} chars",
+
+    kpiToday: "Today",
+    kpiStreak: "Streak",
+    kpiRead: "Total read",
+    kpiWrite: "Total written",
+
+    activeTime: "Active",
+    todayWriting: "Written today",
+    todayEmpty: "No activity today yet — open a note.",
+    startRecording: "Start recording",
+
+    timeByTopic: "Time × Topic",
+    topicRanking: "Topic Ranking",
+    all: "All",
+    backUp: "← Back",
+    activeHours: "Active Hours (Read / Write)",
+    read: "Read",
+    write: "Write",
+
+    activeCalendar: "Activity Calendar",
+    currentStreak: "Current streak",
+    longestStreak: "Longest streak",
+
+    docActivity: "Document Activity",
+    activeDocs: "Active docs",
+    writeDocs: "Written docs",
+    day: "Day",
+    week: "Week",
+    month: "Month",
+    quarter: "Quarter",
+    year: "Year",
+
+    weekCompare: "This Week vs Last",
+    thisWeek: "This week",
+    lastWeek: "Last week",
+    readWriteByDay: "Read vs Write (daily)",
+    wordTrend: "Word Trend (added chars)",
+    addedChars: "Added chars",
+
+    docProfile: "Document Profile",
+    forgotten: "Forgotten (least viewed)",
+    revisitMode: "Revisit Pattern",
+    deep: "Deep focus",
+    review: "Review",
+    stuck: "Stuck",
+
+    docGrowth: "Word Growth",
+    cumulativeChars: "Cumulative chars",
+
+    attentionFlow: "Attention Flow",
+    switchCount: "{n} switches",
+
+    weekdayDist: "Weekday Distribution",
+
+    timeline: "Timeline",
+    time: "Time",
+    note: "Note",
+    duration: "Duration",
+    readWrite: "Read / Write",
+    expandAll: "Expand all",
+    collapse: "Collapse",
+
+    settingsTitle: "ObsTracker Settings",
+    dataDir: "Data directory",
+    dataDirDesc: "Directory for event data (relative to vault root). Changing it writes new data to the new directory.",
+    dashboardPath: "Dashboard note path",
+    dashboardPathDesc: "The \"Open dashboard\" command creates/opens this note (relative to vault root).",
+    heartbeatInterval: "Heartbeat interval (s)",
+    heartbeatDesc: "Timer interval for idle detection. Takes effect immediately.",
+    idleThreshold: "Idle threshold (s)",
+    idleDesc: "How long without interaction counts as idle (excluded from active time).",
+    minSession: "Min session (s)",
+    minSessionDesc: "Sessions shorter than this are discarded as noise. 0 keeps everything.",
+    sliceSec: "Inference slice (s)",
+    sliceDesc: "Slice length for read/write inference, default 300 (5 min).",
+    writeThreshold: "Write char threshold",
+    writeDesc: "Net chars in one slice reaching this value counts as \"writing\". 0 means any edit is writing.",
+    excludePaths: "Exclude paths",
+    excludeDesc: "One prefix per line; files under these paths are not recorded.",
+
+    exportImage: "Export image",
+    exportData: "Export data",
+    exportCsv: "Export CSV",
+    colorTheme: "Color theme",
+    colorThemeDesc: "Base color for dashboard charts.",
+    reloadHint: "Reopen the dashboard to see the effect.",
+    themeAuto: "Follow theme",
+    colorBlue: "Blue",
+    colorPurple: "Purple",
+    colorGreen: "Green",
+    colorOrange: "Orange",
+    colorPink: "Pink",
+    colorTeal: "Teal",
+    language: "Language",
+    languageDesc: "Interface display language.",
+    openDashboard: "Open ObsTracker dashboard",
+    openDashboardCmd: "Open dashboard",
+    dashboardHeading: "ObsTracker Dashboard",
+    dashboardHint: "Maintained by ObsTracker. Data comes live from the local `.obstracker/` directory. This note is editable, version-controllable, and readable by other plugins like Dataview.",
+  },
+};
+
+let currentLocale: Locale = "zh-CN";
+
+export function setLocale(locale: Locale): void {
+  currentLocale = locale;
+}
+
+export function getLocale(): Locale {
+  return currentLocale;
+}
+
+export function t(key: string, params?: Record<string, string | number>): string {
+  let s = messages[currentLocale][key] ?? messages["zh-CN"][key] ?? key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      s = s.replace(`{${k}}`, String(v));
+    }
+  }
+  return s;
+}
+
+/** 星期标签（周一…周日） */
+export function weekdayLabels(): string[] {
+  return currentLocale === "zh-CN"
+    ? ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+}
+
+/** 日历图星期标签（周日…周六，与 ECharts calendar 默认顺序一致） */
+export function calendarDayLabels(): string[] {
+  return currentLocale === "zh-CN"
+    ? ["日", "一", "二", "三", "四", "五", "六"]
+    : ["S", "M", "T", "W", "T", "F", "S"];
+}

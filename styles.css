@@ -1,0 +1,268 @@
+.obstracker-report {
+  --obstracker-radius: var(--radius-m, 12px);
+  padding: 4px 0;
+}
+
+.obstracker-loading {
+  padding: 16px;
+  color: var(--text-muted);
+}
+
+.obstracker-empty {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  padding: 8px 0;
+}
+
+/* ---------- KPI ---------- */
+.obstracker-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.obstracker-kpi {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 12px);
+  padding: 16px 18px;
+}
+
+.obstracker-kpi-value {
+  font-size: 1.7em;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.obstracker-kpi-label {
+  margin-top: 6px;
+  font-size: 0.78em;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 卡片 ---------- */
+.obstracker-card {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 12px);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+.obstracker-card h3 {
+  margin: 0 0 14px;
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--text-normal);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.obstracker-card-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.obstracker-card h4 {
+  margin: 0 0 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ---------- 图表容器 ---------- */
+.obstracker-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.obstracker-chart-tall {
+  height: 480px;
+}
+
+/* ---------- 下钻工具栏 ---------- */
+.obstracker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.obstracker-path {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.obstracker-back {
+  background: var(--background-secondary-alt, var(--background-secondary));
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.obstracker-back:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ---------- 表格 ---------- */
+.obstracker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+
+.obstracker-table th {
+  text-align: left;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.obstracker-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.obstracker-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------- 文档画像 ---------- */
+.obstracker-doc-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.obstracker-doc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.85em;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.obstracker-doc-row:last-child {
+  border-bottom: none;
+}
+
+.obstracker-doc-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obstracker-doc-link {
+  cursor: pointer;
+}
+
+.obstracker-doc-link:hover {
+  color: var(--text-normal);
+  text-decoration: underline;
+}
+
+.obstracker-doc-count {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+/* ---------- 今日焦点 ---------- */
+.obstracker-today-summary {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.obstracker-today-big {
+  min-width: 120px;
+}
+
+.obstracker-today-value {
+  font-size: 1.9em;
+  font-weight: 700;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.obstracker-today-label {
+  margin-top: 4px;
+  font-size: 0.78em;
+  color: var(--text-muted);
+}
+
+.obstracker-today-folders {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 10px;
+}
+
+/* ---------- 活跃日历 ---------- */
+.obstracker-calendar-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+/* ---------- 复访模式标签 ---------- */
+.obstracker-tag {
+  flex: 0 0 auto;
+  font-size: 0.75em;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* ---------- 单篇字数增长 ---------- */
+.obstracker-doc-growth-title {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obstracker-doc-growth-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.obstracker-back.obstracker-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 900px) {
+  .obstracker-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .obstracker-doc-cols {
+    grid-template-columns: 1fr;
+  }
+}
