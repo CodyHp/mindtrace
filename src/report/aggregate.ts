@@ -73,7 +73,10 @@ export interface TodaySummary {
   activeSeconds: number;
   readSeconds: number;
   writeSeconds: number;
+  /** 纯新增字数（写作量） */
   addedChars: number;
+  /** 净增字数（新增 - 删除） */
+  netChars: number;
   topFolders: { folder: string; seconds: number }[];
 }
 
@@ -348,13 +351,20 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     todayWrite += p.writeSeconds;
     todayFolderMap.set(p.top, (todayFolderMap.get(p.top) ?? 0) + p.readSeconds + p.writeSeconds);
   }
-  const todayAdded = edits.filter((e) => localDay(e.ts) === todayStr).reduce((s, e) => s + e.charDelta, 0);
+  let todayWritten = 0;
+  let todayNet = 0;
+  for (const e of edits) {
+    if (localDay(e.ts) !== todayStr) continue;
+    todayWritten += e.addedChars ?? Math.max(0, e.charDelta);
+    todayNet += e.charDelta;
+  }
   const today: TodaySummary = {
     day: todayStr,
     activeSeconds: Math.round(todayActive),
     readSeconds: Math.round(todayRead),
     writeSeconds: Math.round(todayWrite),
-    addedChars: todayAdded,
+    addedChars: todayWritten,
+    netChars: todayNet,
     topFolders: [...todayFolderMap.entries()]
       .map(([folder, seconds]) => ({ folder, seconds: Math.round(seconds) }))
       .sort((a, b) => b.seconds - a.seconds)

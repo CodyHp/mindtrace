@@ -224,6 +224,12 @@
   color: var(--text-muted);
 }
 
+.mindtrace-today-net {
+  margin-top: 2px;
+  font-size: 0.75em;
+  color: var(--text-faint);
+}
+
 .mindtrace-today-folders {
   border-top: 1px solid var(--background-modifier-border);
   padding-top: 10px;

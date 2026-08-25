@@ -263,6 +263,9 @@ function renderToday(el: HTMLElement, report: Report): void {
   const words = summary.createEl("div", { cls: "mindtrace-today-big" });
   words.createEl("div", { cls: "mindtrace-today-value", text: t("chars", { n: today.addedChars }) });
   words.createEl("div", { cls: "mindtrace-today-label", text: t("todayWriting") });
+  if (today.netChars !== today.addedChars) {
+    words.createEl("div", { cls: "mindtrace-today-net", text: `${t("net")} ${t("chars", { n: today.netChars })}` });
+  }
 
   if (today.topFolders.length > 0) {
     const list = box.createEl("div", { cls: "mindtrace-today-folders" });
