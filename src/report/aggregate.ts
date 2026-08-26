@@ -135,6 +135,15 @@ export interface DailyActive {
   seconds: number;
 }
 
+export interface Baseline {
+  /** 历史日平均活跃秒数（排除今天） */
+  avgActiveSeconds: number;
+  /** 历史日平均新增字数（排除今天） */
+  avgAddedChars: number;
+  /** 参与平均的历史天数 */
+  days: number;
+}
+
 export interface DocActivityBucket {
   period: string;
   activeDocs: number;
@@ -166,6 +175,8 @@ export interface Report {
   flow: FlowLink[];
   dailyActive: DailyActive[];
   bestStreak: number;
+  /** 个人基线（历史日平均，用于今天对比） */
+  baseline: Baseline;
   docActivityDaily: DocActivityBucket[];
   docActivityWeekly: DocActivityBucket[];
   docActivityMonthly: DocActivityBucket[];
@@ -443,6 +454,21 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     seconds: Math.round(seconds),
   }));
 
+  // 11.55 个人基线：历史（排除今天）日平均，用于「今天 vs 自己日常」
+  const pastDays = dailyActive.filter((d) => d.day !== todayStr);
+  const avgActiveSeconds = pastDays.length > 0
+    ? Math.round(pastDays.reduce((s, d) => s + d.seconds, 0) / pastDays.length)
+    : 0;
+  const pastWordDays = wordTrend.filter((d) => d.day !== todayStr);
+  const avgAddedChars = pastWordDays.length > 0
+    ? Math.round(pastWordDays.reduce((s, d) => s + d.addedChars, 0) / pastWordDays.length)
+    : 0;
+  const baseline: Baseline = {
+    avgActiveSeconds,
+    avgAddedChars,
+    days: pastDays.length,
+  };
+
   // 11.6 文档活跃度（周/月/年三种粒度的去重篇数）
   const activeDocEvents = processed.map((p) => ({ ts: p.session.ts, notePath: p.session.notePath }));
   const writeDocEvents = edits
@@ -534,6 +560,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     flow,
     dailyActive,
     bestStreak,
+    baseline,
     docActivityDaily,
     docActivityWeekly,
     docActivityMonthly,

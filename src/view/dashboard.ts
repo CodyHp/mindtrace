@@ -475,6 +475,15 @@ function renderToday(box: HTMLElement, report: Report): void {
 }
 
 // ---------- 今日总结（自然语言洞察） ----------
+/** 给片段附加基线对比（至少 3 天历史、差值 ≥10% 才显示） */
+function withBaseline(text: string, value: number, avg: number, days: number): string {
+  if (days < 3 || avg <= 0) return text;
+  const delta = Math.round(((value - avg) / avg) * 100);
+  if (Math.abs(delta) < 10) return text;
+  const cmp = delta > 0 ? t("aboveAvg", { pct: delta }) : t("belowAvg", { pct: -delta });
+  return `${text}（${cmp}）`;
+}
+
 function renderInsights(box: HTMLElement, report: Report): void {
   box.empty();
   const zh = getLocale() === "zh-CN";
@@ -488,10 +497,24 @@ function renderInsights(box: HTMLElement, report: Report): void {
   // 今日一句：片段按数据有无动态拼接
   const parts: string[] = [];
   if (report.today.activeSeconds > 0) {
-    parts.push(t("summaryActive", { active: fmtDuration(report.today.activeSeconds) }));
+    parts.push(
+      withBaseline(
+        t("summaryActive", { active: fmtDuration(report.today.activeSeconds) }),
+        report.today.activeSeconds,
+        report.baseline.avgActiveSeconds,
+        report.baseline.days,
+      ),
+    );
   }
   if (report.today.addedChars > 0) {
-    parts.push(t("summaryChars", { chars: report.today.addedChars }));
+    parts.push(
+      withBaseline(
+        t("summaryChars", { chars: report.today.addedChars }),
+        report.today.addedChars,
+        report.baseline.avgAddedChars,
+        report.baseline.days,
+      ),
+    );
   }
   if (report.today.topFolders.length > 0) {
     parts.push(t("summaryTopic", { topic: displayFolder(report.today.topFolders[0].folder) }));
