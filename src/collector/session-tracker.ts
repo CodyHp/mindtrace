@@ -113,8 +113,6 @@ export class SessionTracker {
 
   private beginSession(view: MarkdownView, notePath: string): void {
     const now = Date.now();
-    // 同步采样基准：用编辑器当前内容，避免 IME 中间态
-    const content = view.editor.getValue();
     this.current = {
       notePath,
       noteTitle: view.file?.basename ?? notePath,
@@ -126,8 +124,9 @@ export class SessionTracker {
       paused: false,
       totalChars: 0,
       totalWords: 0,
-      lastSampledChars: countChars(content),
-      lastSampledWords: countWords(content),
+      // 采样基准待定：用 async 文件快照填充，避免 editor 尚未加载时读到空内容导致字数虚高
+      lastSampledChars: -1,
+      lastSampledWords: -1,
       segments: [],
     };
     this.lastActivityTs = now;
@@ -137,6 +136,11 @@ export class SessionTracker {
       if (this.current && this.current.notePath === notePath) {
         this.current.totalChars = chars;
         this.current.totalWords = words;
+        // 建立采样基准（仅在尚未就绪时）
+        if (this.current.lastSampledChars < 0) {
+          this.current.lastSampledChars = chars;
+          this.current.lastSampledWords = words;
+        }
       }
     });
   }
@@ -172,21 +176,24 @@ export class SessionTracker {
     const file = this.app.vault.getAbstractFileByPath(sess.notePath);
     void this.sampleTotalCount(file instanceof TFile ? file : null).then(({ chars, words }) => {
       // 兜底采样：session 内最后一次采样到结束的净增减（覆盖「写完就切走」场景）
-      const charDelta = chars - sess.lastSampledChars;
-      const wordDelta = words - sess.lastSampledWords;
-      if (charDelta !== 0) {
-        this.eventLog.append(
-          {
-            type: "edit",
-            ts: Date.now(),
-            notePath: sess.notePath,
-            charDelta,
-            wordDelta,
-            addedChars: Math.max(0, charDelta),
-            deletedChars: Math.max(0, -charDelta),
-          },
-          true,
-        );
+      // 基准未就绪（< 0）时跳过，避免把整篇文档字数误判为新增
+      if (sess.lastSampledChars >= 0) {
+        const charDelta = chars - sess.lastSampledChars;
+        const wordDelta = words - sess.lastSampledWords;
+        if (charDelta !== 0) {
+          this.eventLog.append(
+            {
+              type: "edit",
+              ts: Date.now(),
+              notePath: sess.notePath,
+              charDelta,
+              wordDelta,
+              addedChars: Math.max(0, charDelta),
+              deletedChars: Math.max(0, -charDelta),
+            },
+            true,
+          );
+        }
       }
       this.eventLog.append(
         {
@@ -217,42 +224,45 @@ export class SessionTracker {
   }
 
   /**
-   * 空闲采样：停顿 SAMPLE_IDLE_MS 后，把当前文档字数与上一次采样做差，
+   * 空闲采样：停顿 SAMPLE_IDLE_MS 后，读取文档文件字数与上一次采样做差，
    * 落一条 edit 事件（净新增记 +chars，净减少记 -chars）。
-   * 不做逐字符跟踪，避免 IME 组合中间态导致的字数虚高。
+   * 统一用文件快照（cachedRead），不做逐字符跟踪，避免 IME 中间态与 editor 未加载导致字数虚高。
    */
   private sampleWords(): void {
     if (!this.current) return;
     const now = Date.now();
     if (now - this.lastActivityTs < this.SAMPLE_IDLE_MS) return; // 停顿不足，跳过
     if (this.lastSampledAt >= this.lastActivityTs) return; // 本次停顿已采样过
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    if (!view || !view.file || this.isExcluded(view.file.path)) return;
-    const path = view.file.path;
-    if (path !== this.current.notePath) return;
-    const content = view.editor.getValue();
-    const chars = countChars(content);
-    const words = countWords(content);
     this.lastSampledAt = now;
     const cur = this.current;
-    const charDelta = chars - cur.lastSampledChars;
-    const wordDelta = words - cur.lastSampledWords;
-    cur.lastSampledChars = chars;
-    cur.lastSampledWords = words;
-    if (charDelta !== 0) {
-      this.eventLog.append(
-        {
-          type: "edit",
-          ts: now,
-          notePath: path,
-          charDelta,
-          wordDelta,
-          addedChars: Math.max(0, charDelta),
-          deletedChars: Math.max(0, -charDelta),
-        },
-        true,
-      );
-    }
+    const file = this.app.vault.getAbstractFileByPath(cur.notePath);
+    void this.sampleTotalCount(file instanceof TFile ? file : null).then(({ chars, words }) => {
+      if (cur !== this.current) return; // session 已切换，丢弃过期采样
+      if (cur.lastSampledChars < 0) {
+        // 首次采样：仅建立基准，不落盘
+        cur.lastSampledChars = chars;
+        cur.lastSampledWords = words;
+        return;
+      }
+      const charDelta = chars - cur.lastSampledChars;
+      const wordDelta = words - cur.lastSampledWords;
+      cur.lastSampledChars = chars;
+      cur.lastSampledWords = words;
+      if (charDelta !== 0) {
+        this.eventLog.append(
+          {
+            type: "edit",
+            ts: now,
+            notePath: cur.notePath,
+            charDelta,
+            wordDelta,
+            addedChars: Math.max(0, charDelta),
+            deletedChars: Math.max(0, -charDelta),
+          },
+          true,
+        );
+      }
+    });
   }
 
   private onActivity = (): void => {
