@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: MindTraceSettings = {
   minSessionSec: 2,
   sliceSec: 300,
   writeCharThreshold: 20,
-  excludePaths: [".mindtrace", ".obsidian"],
+  excludePaths: [".mindtrace"],
   dashboardPath: "MindTrace.md",
   colorTheme: "theme",
   language: "zh-CN",

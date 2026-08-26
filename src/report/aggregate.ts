@@ -514,11 +514,6 @@ function sessionSegments(session: SessionEvent): [number, number][] {
   return [[session.ts, session.ts + session.activeSeconds * 1000]];
 }
 
-/** 活跃段是否包含某时间点 */
-function segmentContains(segments: [number, number][], ts: number): boolean {
-  return segments.some(([s, e]) => ts >= s && ts < e);
-}
-
 /** 按小时切分 session 的活跃段（多段分别切分再合并） */
 function sessionHourSplit(session: SessionEvent): Map<number, number> {
   const result = new Map<number, number>();

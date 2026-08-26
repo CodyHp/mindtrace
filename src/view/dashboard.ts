@@ -78,7 +78,7 @@ const chartObservers = new WeakMap<Chart, ResizeObserver>();
 /** 复用 DOM 上已存在的实例，没有才 init（实例随 DOM 走，避免销毁重建） */
 function getOrInitChart(div: HTMLElement): Chart {
   const existing = echarts.getInstanceByDom(div);
-  if (existing) return existing as Chart;
+  if (existing) return existing;
   const chart = echarts.init(div);
   const ro = new ResizeObserver(() => {
     try {
@@ -183,10 +183,11 @@ function setEmpty(box: HTMLElement, isEmpty: boolean): void {
 
 // ---------- 导出 ----------
 function downloadUrl(url: string, filename: string): void {
-  const a = document.createElement("a");
+  const a = document.body.createEl("a");
   a.href = url;
   a.download = filename;
   a.click();
+  a.remove();
 }
 
 function downloadText(text: string, filename: string, mime: string): void {
@@ -302,7 +303,7 @@ function scheduleIdle(fn: () => void): void {
   if (typeof requestIdleCallback === "function") {
     requestIdleCallback(() => fn(), { timeout: 600 });
   } else {
-    setTimeout(fn, 0);
+    window.setTimeout(fn, 0);
   }
 }
 

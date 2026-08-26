@@ -151,7 +151,7 @@ export default class MindTracePlugin extends Plugin {
       loading.remove();
       // 等两帧，确保代码块容器完成布局，ECharts 才能拿到正确尺寸
       await new Promise((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)));
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve(null)));
       });
       renderReport(el, report, (path) => {
         void this.app.workspace.openLinkText(path, "", false);

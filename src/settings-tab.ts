@@ -68,7 +68,7 @@ export class MindTraceSettingTab extends PluginSettingTab {
           this.plugin.settings.language = value;
           await this.plugin.saveSettings();
           this.plugin.applyLanguage(value);
-          setTimeout(() => this.display(), 0); // 立即刷新设置面板语言
+          window.setTimeout(() => this.display(), 0); // 立即刷新设置面板语言
         });
       });
 
@@ -103,7 +103,7 @@ export class MindTraceSettingTab extends PluginSettingTab {
       .setDesc(t("excludeDesc"))
       .addTextArea((ta) =>
         ta
-          .setPlaceholder(".mindtrace\n.obsidian")
+          .setPlaceholder(".mindtrace")
           .setValue(this.plugin.settings.excludePaths.join("\n"))
           .onChange(async (value) => {
             this.plugin.settings.excludePaths = value
