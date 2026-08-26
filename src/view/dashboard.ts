@@ -527,6 +527,16 @@ function renderInsights(box: HTMLElement, report: Report): void {
 
   // 静态洞察列表
   const insights: string[] = [];
+  // 注意力集中度（今日 top1 主题占比）
+  const topToday = report.today.topFolders[0];
+  if (topToday && report.today.activeSeconds > 0) {
+    const pct = Math.round((topToday.seconds / report.today.activeSeconds) * 100);
+    if (pct >= 60) {
+      insights.push(t("attentionFocused", { pct, topic: displayFolder(topToday.folder) }));
+    } else if (pct < 40 && report.today.topFolders.length >= 3) {
+      insights.push(t("attentionScattered", { n: report.today.topFolders.length }));
+    }
+  }
   if (report.folderBars.length > 0) {
     const top = report.folderBars[0];
     insights.push(t("insightTopTopic", { topic: displayFolder(top.folder), dur: fmtDuration(top.seconds) }));
