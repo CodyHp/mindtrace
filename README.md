@@ -9,11 +9,11 @@ A silent, local-first **time & attention tracker** for Obsidian — a beautiful 
 [![GitHub release](https://img.shields.io/github/v/release/CodyHp/obstracker?style=flat-square)](https://github.com/CodyHp/obstracker/releases)
 [![License](https://img.shields.io/github/license/CodyHp/obstracker?style=flat-square)](LICENSE)
 
+[English](README.md) · [中文](README.zh-CN.md)
+
 </div>
 
 ---
-
-**MindTrace（注意力 / 时间追踪）** 是一款本地优先的 Obsidian 插件：它静默记录你在每篇笔记上的阅读与写作时长，按「主题 × 时间」还原你的注意力流向——一眼看清「早晨属于哲学，下午属于代码」，并用自然语言总结你的习惯。数据全部留在本地，永不上传。
 
 ## ✨ The one chart that explains your day
 
