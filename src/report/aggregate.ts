@@ -47,7 +47,12 @@ export interface DocFrequency {
 
 export interface DocPerformance {
   notePath: string;
-  views: number;
+  /** 进入该笔记的 session 次数（访问次数，而非浏览次数） */
+  visits: number;
+  /** 有多少天被使用过 */
+  activeDays: number;
+  /** 复访率 = visits / activeDays */
+  revisitRate: number;
   activeSeconds: number;
   addedChars: number;
   lastTs: number;
@@ -252,12 +257,13 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   }));
 
   // 5 / 6. 文档频率 + 遗忘 + 复访模式
-  const docMap = new Map<string, { count: number; lastTs: number; totalSeconds: number }>();
+  const docMap = new Map<string, { count: number; lastTs: number; totalSeconds: number; days: Set<string> }>();
   for (const p of processed) {
     const path = p.session.notePath;
-    const cur = docMap.get(path) ?? { count: 0, lastTs: 0, totalSeconds: 0 };
+    const cur = docMap.get(path) ?? { count: 0, lastTs: 0, totalSeconds: 0, days: new Set() };
     cur.count += 1;
     cur.totalSeconds += p.readSeconds + p.writeSeconds;
+    cur.days.add(localDay(p.session.ts));
     if (p.session.ts > cur.lastTs) cur.lastTs = p.session.ts;
     docMap.set(path, cur);
   }
@@ -288,15 +294,20 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   }
   revisit.sort((a, b) => b.count - a.count);
 
-  // 6.5 文档表现（热门 / 趋势，字数用 idle 采样的 edit 事件净新增）
+  // 6.5 文档表现（访问 / 活跃天数 / 复访率 / 时长 / 写作量）
   const docPerformance: DocPerformance[] = [...docMap.entries()]
-    .map(([notePath, v]) => ({
-      notePath,
-      views: v.count,
-      activeSeconds: Math.round(v.totalSeconds),
-      addedChars: editAddedByDoc.get(notePath) ?? 0,
-      lastTs: v.lastTs,
-    }))
+    .map(([notePath, v]) => {
+      const activeDays = v.days.size;
+      return {
+        notePath,
+        visits: v.count,
+        activeDays,
+        revisitRate: activeDays > 0 ? Math.round((v.count / activeDays) * 10) / 10 : 0,
+        activeSeconds: Math.round(v.totalSeconds),
+        addedChars: editAddedByDoc.get(notePath) ?? 0,
+        lastTs: v.lastTs,
+      };
+    })
     .sort((a, b) => b.activeSeconds - a.activeSeconds)
     .slice(0, 20);
 

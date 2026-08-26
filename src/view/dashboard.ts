@@ -696,13 +696,13 @@ function renderWritePeak(box: HTMLElement, report: Report, theme: ThemeVars): vo
   const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
-    legend: { data: [t("read"), t("write")], top: 0, textStyle: { color: theme.textMuted } },
+    legend: { data: [t("readInferred"), t("writeInferred")], top: 0, textStyle: { color: theme.textMuted } },
     grid: { left: 60, right: 20, top: 34, bottom: 30 },
     xAxis: { type: "category", data: report.writePeak.map((p) => `${p.hour}`), ...axisCommon(theme) },
     yAxis: { type: "value", ...axisCommon(theme), axisLabel: { color: theme.textMuted, formatter: (v: number) => fmtDuration(v) } },
     series: [
-      { name: t("read"), type: "bar", stack: "t", data: report.writePeak.map((p) => p.readSeconds), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.5) } },
-      { name: t("write"), type: "bar", stack: "t", data: report.writePeak.map((p) => p.writeSeconds), itemStyle: { color: theme.accent } },
+      { name: t("readInferred"), type: "bar", stack: "t", data: report.writePeak.map((p) => p.readSeconds), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.5) } },
+      { name: t("writeInferred"), type: "bar", stack: "t", data: report.writePeak.map((p) => p.writeSeconds), itemStyle: { color: theme.accent } },
     ],
   } as any);
   ensureExportActions(box, chart, report.writePeak, "active-hours");
@@ -1013,13 +1013,13 @@ function renderReadWrite(box: HTMLElement, report: Report, theme: ThemeVars): vo
   const chart = getOrInitChart(div);
   chart.setOption({
     tooltip: { ...baseTooltip(theme), trigger: "axis", valueFormatter: (v: number) => fmtDuration(v) },
-    legend: { data: [t("read"), t("write")], top: 0, textStyle: { color: theme.textMuted } },
+    legend: { data: [t("readInferred"), t("writeInferred")], top: 0, textStyle: { color: theme.textMuted } },
     grid: { left: 70, right: 20, top: 34, bottom: 30 },
     xAxis: { type: "category", data: days.map((d) => d.day), ...axisCommon(theme) },
     yAxis: { type: "value", ...axisCommon(theme), axisLabel: { color: theme.textMuted, formatter: (v: number) => fmtDuration(v) } },
     series: [
-      { name: t("read"), type: "bar", stack: "t", data: days.map((d) => d.readSeconds), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.5) } },
-      { name: t("write"), type: "bar", stack: "t", data: days.map((d) => d.writeSeconds), itemStyle: { color: theme.accent } },
+      { name: t("readInferred"), type: "bar", stack: "t", data: days.map((d) => d.readSeconds), itemStyle: { color: mixHex(theme.accent, theme.bg, 0.5) } },
+      { name: t("writeInferred"), type: "bar", stack: "t", data: days.map((d) => d.writeSeconds), itemStyle: { color: theme.accent } },
     ],
   } as any);
   ensureExportActions(box, chart, report.readWriteByDay, "read-write");
@@ -1058,14 +1058,18 @@ function renderDocPerformance(box: HTMLElement, report: Report): void {
   const table = box.createEl("table", { cls: "mindtrace-table" });
   const head = table.createEl("thead").createEl("tr");
   head.createEl("th", { text: t("note") });
-  head.createEl("th", { text: t("views") });
+  head.createEl("th", { text: t("visits") });
+  head.createEl("th", { text: t("activeDays") });
+  head.createEl("th", { text: t("revisitRate") });
   head.createEl("th", { text: t("duration") });
   head.createEl("th", { text: t("addedChars") });
   const body = table.createEl("tbody");
   for (const d of report.docPerformance.slice(0, 10)) {
     const tr = body.createEl("tr");
     tr.createEl("td", { text: d.notePath });
-    tr.createEl("td", { text: String(d.views) });
+    tr.createEl("td", { text: String(d.visits) });
+    tr.createEl("td", { text: String(d.activeDays) });
+    tr.createEl("td", { text: d.revisitRate.toFixed(1) });
     tr.createEl("td", { text: fmtDuration(d.activeSeconds) });
     tr.createEl("td", { text: `+${d.addedChars}` });
   }

@@ -43,6 +43,8 @@ const messages: Record<Locale, Record<string, string>> = {
     activeHours: "活跃时段（阅读 / 写作）",
     read: "阅读",
     write: "写作",
+    readInferred: "阅读（推断）",
+    writeInferred: "写作（推断）",
 
     activeCalendar: "活跃日历",
     currentStreak: "当前连续",
@@ -69,7 +71,10 @@ const messages: Record<Locale, Record<string, string>> = {
 
     docProfile: "文档画像",
     docPerformance: "文档表现",
-    views: "打开次数",
+    visits: "访问",
+    activeDays: "活跃天数",
+    revisitRate: "复访率",
+    inferred: "推断",
     forgotten: "遗忘提醒（最久没看）",
     revisitMode: "复访模式",
     deep: "深耕型",
@@ -172,6 +177,8 @@ const messages: Record<Locale, Record<string, string>> = {
     activeHours: "Active Hours (Read / Write)",
     read: "Read",
     write: "Write",
+    readInferred: "Read (est.)",
+    writeInferred: "Write (est.)",
 
     activeCalendar: "Activity Calendar",
     currentStreak: "Current streak",
@@ -198,7 +205,10 @@ const messages: Record<Locale, Record<string, string>> = {
 
     docProfile: "Document Profile",
     docPerformance: "Content Performance",
-    views: "Views",
+    visits: "Visits",
+    activeDays: "Active days",
+    revisitRate: "Revisit rate",
+    inferred: "estimated",
     forgotten: "Forgotten (least viewed)",
     revisitMode: "Revisit Pattern",
     deep: "Deep focus",
