@@ -171,6 +171,12 @@ export interface Report {
   docActivityMonthly: DocActivityBucket[];
   docActivityQuarterly: DocActivityBucket[];
   docActivityYearly: DocActivityBucket[];
+  /** 追踪起始日期（YYYY-MM-DD），无数据为空串 */
+  trackedSince: string;
+  /** 数据覆盖度 0-100（有数据天数 / 追踪总天数） */
+  dataCoverage: number;
+  /** 被过滤的异常超长 session 数 */
+  excludedSessions: number;
 }
 
 /** 从原始事件流构建完整报表数据 */
@@ -192,8 +198,12 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   }
 
   const processed: ProcessedSession[] = [];
+  let excludedSessions = 0;
   for (const s of sessions) {
-    if (s.activeSeconds > MAX_SESSION_SEC) continue; // 过滤挂机污染的超长会话
+    if (s.activeSeconds > MAX_SESSION_SEC) {
+      excludedSessions += 1; // 过滤挂机污染的超长会话
+      continue;
+    }
     const levels = folderLevels(s.notePath);
     const folders = levels.length > 0 ? levels : [UNCATEGORIZED];
     const top = levels.length > 0 ? levels[0] : UNCATEGORIZED;
@@ -407,6 +417,15 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   const streak = calcStreak(activeDays);
   const bestStreak = calcBestStreak(activeDays);
 
+  // 11.1 数据质量：追踪起始日期 + 覆盖度
+  const trackedSince = activeDays.size > 0 ? [...activeDays].sort()[0] : "";
+  let dataCoverage = 0;
+  if (trackedSince) {
+    const start = new Date(trackedSince).getTime();
+    const totalDays = Math.floor((Date.now() - start) / 86400000) + 1;
+    dataCoverage = totalDays > 0 ? Math.round((activeDays.size / totalDays) * 100) : 100;
+  }
+
   // 11.5 每日活跃（日历热力图）
   const dailyMap = new Map<string, number>();
   for (const p of processed) {
@@ -514,6 +533,9 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     docActivityMonthly,
     docActivityQuarterly,
     docActivityYearly,
+    trackedSince,
+    dataCoverage,
+    excludedSessions,
   };
 }
 

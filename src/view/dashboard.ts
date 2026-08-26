@@ -357,6 +357,12 @@ export function renderReport(el: HTMLElement, report: Report, openFile?: (path: 
   } catch (e) {
     console.error("MindTrace render failed:", e);
   }
+  try {
+    const dq = ensureBlock(el, "data-quality", t("dataQuality"));
+    renderDataQuality(dq, report);
+  } catch (e) {
+    console.error("MindTrace render failed:", e);
+  }
 
   // 无数据：显示引导提示，隐藏图表块
   if (report.totalSeconds === 0) {
@@ -521,6 +527,22 @@ function renderInsights(box: HTMLElement, report: Report): void {
   if (insights.length > 0) {
     const list = box.createEl("ul", { cls: "mindtrace-insight-list" });
     for (const s of insights.slice(0, 6)) list.createEl("li", { text: s });
+  }
+}
+
+// ---------- 数据质量（追踪起始 / 覆盖度 / 排除异常） ----------
+function renderDataQuality(box: HTMLElement, report: Report): void {
+  box.empty();
+  if (!report.trackedSince) {
+    box.addClass("mindtrace-hidden");
+    return;
+  }
+  box.removeClass("mindtrace-hidden");
+  const stats = box.createEl("div", { cls: "mindtrace-calendar-stats" });
+  stats.createEl("span", { text: `${t("trackedSince")} ${report.trackedSince}` });
+  stats.createEl("span", { text: `${t("dataCoverage")} ${report.dataCoverage}%` });
+  if (report.excludedSessions > 0) {
+    stats.createEl("span", { text: `${t("excludedSessions")} ${report.excludedSessions}` });
   }
 }
 

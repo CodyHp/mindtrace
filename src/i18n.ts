@@ -34,6 +34,10 @@ const messages: Record<Locale, Record<string, string>> = {
     insightBestStreak: "最长连续记录 {n} 天",
     insightWeekMore: "本周你在「{topic}」花了 {this}，比上周多 {delta}",
     insightWeekLess: "本周你在「{topic}」花了 {this}，比上周少 {delta}",
+    dataQuality: "数据质量",
+    trackedSince: "追踪自",
+    dataCoverage: "覆盖度",
+    excludedSessions: "排除异常",
     startRecording: "开始记录",
 
     timeByTopic: "时段 × 主题",
@@ -174,6 +178,10 @@ const messages: Record<Locale, Record<string, string>> = {
     insightBestStreak: "Longest streak: {n} days",
     insightWeekMore: "This week you spent {this} on “{topic}”, {delta} more than last week",
     insightWeekLess: "This week you spent {this} on “{topic}”, {delta} less than last week",
+    dataQuality: "Data quality",
+    trackedSince: "Tracked since",
+    dataCoverage: "Coverage",
+    excludedSessions: "Excluded",
     startRecording: "Start recording",
 
     timeByTopic: "Time × Topic",
