@@ -2,7 +2,7 @@ import * as echarts from "echarts/core";
 import { BarChart, GraphChart, HeatmapChart, LineChart } from "echarts/charts";
 import { CalendarComponent, GridComponent, LegendComponent, TooltipComponent, VisualMapComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
-import { FolderNode, Report, RevisitMode } from "../report/aggregate";
+import { DocPerformance, FolderNode, Report, RevisitMode } from "../report/aggregate";
 import { UNCATEGORIZED } from "../report/classify";
 import { calendarDayLabels, getLocale, t, weekdayLabels } from "../i18n";
 import { localDay } from "../utils";
@@ -1049,30 +1049,100 @@ function renderWordTrend(box: HTMLElement, report: Report, theme: ThemeVars): vo
   ensureExportActions(box, chart, report.wordTrend, "word-trend");
 }
 
+interface RankingMode {
+  key: string;
+  label: string;
+  mainLabel: string;
+  subLabel: string;
+  sort: (a: DocPerformance, b: DocPerformance) => number;
+  main: (d: DocPerformance) => string;
+  sub: (d: DocPerformance) => string;
+}
+
+function rankingModes(): RankingMode[] {
+  return [
+    {
+      key: "visited", label: t("mostVisited"), mainLabel: t("visits"), subLabel: t("activeDays"),
+      sort: (a, b) => b.visits - a.visits,
+      main: (d) => String(d.visits), sub: (d) => String(d.activeDays),
+    },
+    {
+      key: "time", label: t("mostTime"), mainLabel: t("duration"), subLabel: t("visits"),
+      sort: (a, b) => b.activeSeconds - a.activeSeconds,
+      main: (d) => fmtDuration(d.activeSeconds), sub: (d) => String(d.visits),
+    },
+    {
+      key: "written", label: t("mostWritten"), mainLabel: t("addedChars"), subLabel: t("duration"),
+      sort: (a, b) => b.addedChars - a.addedChars,
+      main: (d) => `+${d.addedChars}`, sub: (d) => fmtDuration(d.activeSeconds),
+    },
+    {
+      key: "revisited", label: t("mostRevisited"), mainLabel: t("revisitRate"), subLabel: t("visits"),
+      sort: (a, b) => b.revisitRate - a.revisitRate,
+      main: (d) => d.revisitRate.toFixed(1), sub: (d) => String(d.visits),
+    },
+    {
+      key: "trending", label: t("trending"), mainLabel: t("lastSeen"), subLabel: t("visits"),
+      sort: (a, b) => b.lastTs - a.lastTs,
+      main: (d) => lastText(d.lastTs), sub: (d) => String(d.visits),
+    },
+  ];
+}
+
 function renderDocPerformance(box: HTMLElement, report: Report): void {
   box.empty();
   if (report.docPerformance.length === 0) {
     box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
     return;
   }
+
+  const modes = rankingModes();
+  let current = Number(box.dataset.mode ?? 0);
+
+  let switcher = box.querySelector<HTMLElement>(".mindtrace-doc-growth-switcher");
+  let buttons: HTMLElement[];
+  if (!switcher) {
+    switcher = box.createEl("div", { cls: "mindtrace-doc-growth-switcher" });
+    buttons = modes.map(() => switcher!.createEl("button", { cls: "mindtrace-back" }));
+  } else {
+    buttons = Array.from(switcher.querySelectorAll<HTMLElement>("button"));
+  }
+
   const table = box.createEl("table", { cls: "mindtrace-table" });
   const head = table.createEl("thead").createEl("tr");
   head.createEl("th", { text: t("note") });
-  head.createEl("th", { text: t("visits") });
-  head.createEl("th", { text: t("activeDays") });
-  head.createEl("th", { text: t("revisitRate") });
-  head.createEl("th", { text: t("duration") });
-  head.createEl("th", { text: t("addedChars") });
+  const mainTh = head.createEl("th");
+  const subTh = head.createEl("th");
   const body = table.createEl("tbody");
-  for (const d of report.docPerformance.slice(0, 10)) {
-    const tr = body.createEl("tr");
-    tr.createEl("td", { text: d.notePath });
-    tr.createEl("td", { text: String(d.visits) });
-    tr.createEl("td", { text: String(d.activeDays) });
-    tr.createEl("td", { text: d.revisitRate.toFixed(1) });
-    tr.createEl("td", { text: fmtDuration(d.activeSeconds) });
-    tr.createEl("td", { text: `+${d.addedChars}` });
-  }
+
+  const draw = (): void => {
+    const m = modes[current];
+    const list = [...report.docPerformance].sort(m.sort).slice(0, 10);
+    mainTh.textContent = m.mainLabel;
+    subTh.textContent = m.subLabel;
+    body.empty();
+    for (const d of list) {
+      const tr = body.createEl("tr");
+      tr.createEl("td", { text: d.notePath });
+      tr.createEl("td", { text: m.main(d) });
+      tr.createEl("td", { text: m.sub(d) });
+    }
+  };
+
+  buttons.forEach((btn, i) => {
+    btn.textContent = modes[i].label;
+    btn.removeClass("mindtrace-active");
+    if (i === current) btn.addClass("mindtrace-active");
+    btn.onclick = (): void => {
+      current = i;
+      box.dataset.mode = String(i);
+      buttons.forEach((b) => b.removeClass("mindtrace-active"));
+      btn.addClass("mindtrace-active");
+      draw();
+    };
+  });
+
+  draw();
 }
 
 function renderDocs(box: HTMLElement, report: Report, theme: ThemeVars, openFile?: (path: string) => void): void {
@@ -1113,15 +1183,15 @@ function docLink(parent: HTMLElement, notePath: string, openFile?: (path: string
 }
 
 function modeColor(mode: RevisitMode, theme: ThemeVars): string {
-  if (mode === "深耕型") return theme.accent;
-  if (mode === "复习型") return "#50a078";
+  if (mode === "deep") return theme.accent;
+  if (mode === "frequent") return "#50a078";
   return "#dc8250";
 }
 
 function modeLabel(mode: RevisitMode): string {
-  if (mode === "深耕型") return t("deep");
-  if (mode === "复习型") return t("review");
-  return t("stuck");
+  if (mode === "deep") return t("deep");
+  if (mode === "frequent") return t("frequent");
+  return t("quick");
 }
 
 function renderTimeline(box: HTMLElement, report: Report): void {

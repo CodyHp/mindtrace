@@ -46,24 +46,24 @@ describe("buildReport 新增指标", () => {
     expect(philosophy?.thisWeek).toBe(1800);
   });
 
-  it("revisit：多次短打开 → 写不动型", () => {
+  it("revisit：多次短打开 → 快速访问", () => {
     const sessions = [0, 1, 2, 3].map(() => makeSession({ activeSeconds: 30, notePath: "难产.md" }));
     const r = buildReport(sessions, settings);
     const doc = r.revisit.find((d) => d.notePath === "难产.md");
-    expect(doc?.mode).toBe("写不动型");
+    expect(doc?.mode).toBe("quick");
   });
 
-  it("revisit：单次长停留 → 深耕型", () => {
+  it("revisit：单次长停留 → 深度使用", () => {
     const r = buildReport([makeSession({ activeSeconds: 3600 })], settings);
     const doc = r.revisit.find((d) => d.notePath === "哲学/康德.md");
-    expect(doc?.mode).toBe("深耕型");
+    expect(doc?.mode).toBe("deep");
   });
 
-  it("revisit：多次中等时长 → 复习型", () => {
+  it("revisit：多次中等时长 → 频繁复访", () => {
     const sessions = [0, 1, 2].map(() => makeSession({ activeSeconds: 300, notePath: "复习.md" }));
     const r = buildReport(sessions, settings);
     const doc = r.revisit.find((d) => d.notePath === "复习.md");
-    expect(doc?.mode).toBe("复习型");
+    expect(doc?.mode).toBe("frequent");
   });
 
   it("weekday：7 个桶，总时长守恒", () => {

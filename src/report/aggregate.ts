@@ -97,7 +97,7 @@ export interface WeekCompare {
   lastWeek: number;
 }
 
-export type RevisitMode = "深耕型" | "复习型" | "写不动型";
+export type RevisitMode = "deep" | "frequent" | "quick";
 
 export interface RevisitDoc {
   notePath: string;
@@ -279,9 +279,9 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   for (const [notePath, v] of docMap) {
     const avgSeconds = v.count > 0 ? v.totalSeconds / v.count : 0;
     let mode: RevisitMode | null = null;
-    if (avgSeconds >= 1800) mode = "深耕型";
-    else if (v.count >= 3 && avgSeconds < 60) mode = "写不动型";
-    else if (v.count >= 3) mode = "复习型";
+    if (avgSeconds >= 1800) mode = "deep";
+    else if (v.count >= 3 && avgSeconds < 60) mode = "quick";
+    else if (v.count >= 3) mode = "frequent";
     if (mode) {
       revisit.push({
         notePath,
