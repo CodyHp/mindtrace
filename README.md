@@ -6,8 +6,8 @@
 
 A silent, local-first **time & attention tracker** for Obsidian — a beautiful topic × time dashboard that reveals your focus, your writing output, and your habits.
 
-[![GitHub release](https://img.shields.io/github/v/release/CodyHp/mindtrace?style=flat-square)](https://github.com/CodyHp/mindtrace/releases)
-[![License](https://img.shields.io/github/license/CodyHp/mindtrace?style=flat-square)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/CodyHp/obstracker?style=flat-square)](https://github.com/CodyHp/obstracker/releases)
+[![License](https://img.shields.io/github/license/CodyHp/obstracker?style=flat-square)](LICENSE)
 
 </div>
 
@@ -54,8 +54,8 @@ Data is written as append-only JSONL to `.mindtrace/` in your vault. **No networ
 
 From the Obsidian Community Plugins directory, search **MindTrace** and install. Or manually:
 
-1. Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/CodyHp/mindtrace/releases).
-2. Copy them into `<vault>/.obsidian/plugins/mindtrace/`.
+1. Download `main.js`, `manifest.json`, `styles.css` from the [latest release](https://github.com/CodyHp/obstracker/releases).
+2. Copy them into `<vault>/.obsidian/plugins/obstracker/`.
 3. Enable **MindTrace** in Settings → Community plugins.
 
 ## 🖱 Usage
