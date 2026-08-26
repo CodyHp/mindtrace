@@ -38,6 +38,9 @@ const messages: Record<Locale, Record<string, string>> = {
     trackedSince: "追踪自",
     dataCoverage: "覆盖度",
     excludedSessions: "排除异常",
+    coverageDetail: "近 {total} 天中有 {active} 天有记录",
+    abnormalSessions: "条挂机会话",
+    dataQualityHint: "数据完整性与可信度",
     startRecording: "开始记录",
 
     timeByTopic: "时段 × 主题",
@@ -182,6 +185,9 @@ const messages: Record<Locale, Record<string, string>> = {
     trackedSince: "Tracked since",
     dataCoverage: "Coverage",
     excludedSessions: "Excluded",
+    coverageDetail: "active on {active} of {total} days",
+    abnormalSessions: "abnormal sessions",
+    dataQualityHint: "Data completeness & trustworthiness",
     startRecording: "Start recording",
 
     timeByTopic: "Time × Topic",

@@ -530,7 +530,7 @@ function renderInsights(box: HTMLElement, report: Report): void {
   }
 }
 
-// ---------- 数据质量（追踪起始 / 覆盖度 / 排除异常） ----------
+// ---------- 数据质量（覆盖度进度条 / 追踪起始 / 排除异常） ----------
 function renderDataQuality(box: HTMLElement, report: Report): void {
   box.empty();
   if (!report.trackedSince) {
@@ -538,11 +538,34 @@ function renderDataQuality(box: HTMLElement, report: Report): void {
     return;
   }
   box.removeClass("mindtrace-hidden");
-  const stats = box.createEl("div", { cls: "mindtrace-calendar-stats" });
-  stats.createEl("span", { text: `${t("trackedSince")} ${report.trackedSince}` });
-  stats.createEl("span", { text: `${t("dataCoverage")} ${report.dataCoverage}%` });
+
+  box.createEl("div", { cls: "mindtrace-dq-hint", text: t("dataQualityHint") });
+
+  // 覆盖度（进度条 + 具体天数）
+  const cov = box.createEl("div", { cls: "mindtrace-dq-row" });
+  const covHead = cov.createEl("div", { cls: "mindtrace-dq-head" });
+  covHead.createEl("span", { cls: "mindtrace-dq-label", text: t("dataCoverage") });
+  covHead.createEl("span", { cls: "mindtrace-dq-value", text: `${report.dataCoverage}%` });
+  const bar = cov.createEl("div", { cls: "mindtrace-dq-bar" });
+  bar.createEl("div", { cls: "mindtrace-dq-fill", attr: { style: `width:${report.dataCoverage}%` } });
+  cov.createEl("div", {
+    cls: "mindtrace-dq-sub",
+    text: t("coverageDetail", { active: report.activeDaysCount, total: report.trackedDays }),
+  });
+
+  // 追踪自
+  const since = box.createEl("div", { cls: "mindtrace-dq-row" });
+  since.createEl("span", { cls: "mindtrace-dq-label", text: t("trackedSince") });
+  since.createEl("span", {
+    cls: "mindtrace-dq-value",
+    text: `${report.trackedSince} · ${t("days", { n: report.trackedDays })}`,
+  });
+
+  // 排除异常
   if (report.excludedSessions > 0) {
-    stats.createEl("span", { text: `${t("excludedSessions")} ${report.excludedSessions}` });
+    const ex = box.createEl("div", { cls: "mindtrace-dq-row" });
+    ex.createEl("span", { cls: "mindtrace-dq-label", text: t("excludedSessions") });
+    ex.createEl("span", { cls: "mindtrace-dq-value", text: `${report.excludedSessions} ${t("abnormalSessions")}` });
   }
 }
 

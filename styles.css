@@ -255,6 +255,55 @@
   margin: 2px 0;
 }
 
+/* ---------- 数据质量 ---------- */
+.mindtrace-dq-hint {
+  font-size: 0.78em;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+}
+
+.mindtrace-dq-row {
+  margin: 10px 0;
+}
+
+.mindtrace-dq-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.mindtrace-dq-label {
+  font-size: 0.85em;
+  color: var(--text-muted);
+}
+
+.mindtrace-dq-value {
+  font-weight: 600;
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+
+.mindtrace-dq-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.mindtrace-dq-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.mindtrace-dq-sub {
+  margin-top: 4px;
+  font-size: 0.75em;
+  color: var(--text-faint);
+}
+
 /* ---------- 活跃日历 ---------- */
 .mindtrace-calendar-stats {
   display: flex;

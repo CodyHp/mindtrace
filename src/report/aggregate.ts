@@ -173,6 +173,10 @@ export interface Report {
   docActivityYearly: DocActivityBucket[];
   /** 追踪起始日期（YYYY-MM-DD），无数据为空串 */
   trackedSince: string;
+  /** 追踪总跨度天数（从 trackedSince 到今天） */
+  trackedDays: number;
+  /** 有 session 记录的天数 */
+  activeDaysCount: number;
   /** 数据覆盖度 0-100（有数据天数 / 追踪总天数） */
   dataCoverage: number;
   /** 被过滤的异常超长 session 数 */
@@ -419,12 +423,14 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
 
   // 11.1 数据质量：追踪起始日期 + 覆盖度
   const trackedSince = activeDays.size > 0 ? [...activeDays].sort()[0] : "";
+  let trackedDays = 0;
   let dataCoverage = 0;
   if (trackedSince) {
     const start = new Date(trackedSince).getTime();
-    const totalDays = Math.floor((Date.now() - start) / 86400000) + 1;
-    dataCoverage = totalDays > 0 ? Math.round((activeDays.size / totalDays) * 100) : 100;
+    trackedDays = Math.floor((Date.now() - start) / 86400000) + 1;
+    dataCoverage = trackedDays > 0 ? Math.round((activeDays.size / trackedDays) * 100) : 100;
   }
+  const activeDaysCount = activeDays.size;
 
   // 11.5 每日活跃（日历热力图）
   const dailyMap = new Map<string, number>();
@@ -534,6 +540,8 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     docActivityQuarterly,
     docActivityYearly,
     trackedSince,
+    trackedDays,
+    activeDaysCount,
     dataCoverage,
     excludedSessions,
   };
