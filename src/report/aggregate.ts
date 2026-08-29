@@ -504,7 +504,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     return { weekday: Number(k.slice(0, idx)), hour: Number(k.slice(idx + 1)), seconds: Math.round(v) };
   });
 
-  // 13. 单篇字数增长（top 高频文档的 edit 事件累计轨迹）
+  // 13. 单篇字数增长（按累计净增长排序，显示增长最多的文档，而非高频文档）
   const growthMap = new Map<string, { ts: number; cumulative: number }[]>();
   for (const e of edits) {
     const list = growthMap.get(e.notePath) ?? [];
@@ -512,10 +512,16 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     list.push({ ts: e.ts, cumulative: prev + e.charDelta });
     growthMap.set(e.notePath, list);
   }
-  const docGrowth: DocGrowth[] = frequentDocs
+  const docGrowth: DocGrowth[] = [...growthMap.entries()]
+    .map(([notePath, points]) => ({
+      notePath,
+      points,
+      growth: points.length > 0 ? points[points.length - 1].cumulative : 0,
+    }))
+    .filter((d) => d.points.length > 1 && d.growth > 0)
+    .sort((a, b) => b.growth - a.growth)
     .slice(0, 10)
-    .map((d) => ({ notePath: d.notePath, points: growthMap.get(d.notePath) ?? [] }))
-    .filter((d) => d.points.length > 1);
+    .map(({ notePath, points }) => ({ notePath, points }));
 
   // 14. 主题注意力流向（相邻 session 且间隔 < 5 分钟的切换）
   const sorted = [...processed].sort((a, b) => a.session.ts - b.session.ts);
