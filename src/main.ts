@@ -7,7 +7,7 @@ import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
 import { loadSummaries, settleOldEvents } from "./storage/summarizer";
 import { Locale, setLocale, t } from "./i18n";
-import { MindTraceSettings, SUMMARY_PREFIX, TrackedEvent } from "./types";
+import { DaySummary, MindTraceSettings, SUMMARY_PREFIX, TrackedEvent } from "./types";
 import { bumpRenderVersion, renderReport, setColorTheme as applyColorTheme, unmountReport } from "./view/dashboard";
 
 function dashboardTemplate(): string {
@@ -143,6 +143,15 @@ export default class MindTracePlugin extends Plugin {
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
       const summaries = await loadSummaries(this.app, this.settings.dataDir);
+      // 过滤历史摘要 docs 里已删除的文件（pathExists 只覆盖 events，不覆盖 summary.docs）
+      const filteredSummaries: DaySummary[] = summaries.map((sum) => {
+        const docs: DaySummary["docs"] = {};
+        for (const [notePath, doc] of Object.entries(sum.docs)) {
+          if (notePath === this.settings.dashboardPath) continue;
+          if (this.pathExists(notePath)) docs[notePath] = doc;
+        }
+        return { ...sum, docs };
+      });
       // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）与看板笔记自身；
       // 虚拟事件（从历史摘要反序列化）不检查文件存在
       const filtered = events.filter((ev) => {
@@ -155,11 +164,11 @@ export default class MindTracePlugin extends Plugin {
       let report: Report;
       if (hasLive) {
         // 有进行中会话：每次重建（活跃实时变化），不更新缓存
-        report = buildReport([...filtered, live], this.settings, summaries);
+        report = buildReport([...filtered, live], this.settings, filteredSummaries);
       } else if (this.lastEventsRef === events) {
         report = this.lastReport!;
       } else {
-        report = buildReport(filtered, this.settings, summaries);
+        report = buildReport(filtered, this.settings, filteredSummaries);
         this.lastEventsRef = events;
         this.lastReport = report;
       }
