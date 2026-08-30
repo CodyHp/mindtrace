@@ -30,24 +30,34 @@ export async function loadEvents(app: App, dataDir: string): Promise<TrackedEven
     const list = await adapter.list(dataDir);
     const files = list.files.filter((f) => f.endsWith(".jsonl") && !f.includes("summary-"));
     const stamps: FileStamp[] = [];
+    const validFiles: string[] = [];
     for (const f of files) {
-      const st = await adapter.stat(f);
-      stamps.push({ path: f, mtime: st?.mtime ?? 0, size: st?.size ?? 0 });
+      try {
+        const st = await adapter.stat(f);
+        stamps.push({ path: f, mtime: st?.mtime ?? 0, size: st?.size ?? 0 });
+        validFiles.push(f);
+      } catch {
+        // 文件刚被结算删除，跳过（ENOENT 竞态）
+      }
     }
     if (cached && sameStamps(cached.stamps, stamps)) {
       return cached.events;
     }
     const events: TrackedEvent[] = [];
-    for (const f of files) {
-      const content = await adapter.read(f);
-      for (const line of content.split("\n")) {
-        const t = line.trim();
-        if (!t) continue;
-        try {
-          events.push(JSON.parse(t) as TrackedEvent);
-        } catch {
-          // 跳过坏行
+    for (const f of validFiles) {
+      try {
+        const content = await adapter.read(f);
+        for (const line of content.split("\n")) {
+          const t = line.trim();
+          if (!t) continue;
+          try {
+            events.push(JSON.parse(t) as TrackedEvent);
+          } catch {
+            // 跳过坏行
+          }
         }
+      } catch {
+        // 文件刚被删除，跳过
       }
     }
     const summaries = await loadSummaries(app, dataDir);
