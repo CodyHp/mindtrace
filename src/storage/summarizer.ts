@@ -16,6 +16,12 @@ export async function settleOldEvents(app: App, settings: MindTraceSettings): Pr
   if (!(await adapter.exists(dir))) return;
   const list = await adapter.list(dir);
   const cutoff = dayBefore(localDay(Date.now()), settings.retentionDays);
+
+  // 幂等：先收集已结算的 day（从现有摘要），避免「写摘要成功但删原始失败」后重复聚合
+  const settledDays = new Set<string>();
+  const existingSummaries = await loadSummaries(app, settings.dataDir);
+  for (const s of existingSummaries) settledDays.add(s.day);
+
   const expired = list.files.filter((f) => {
     const m = f.match(/events-(\d{4}-\d{2}-\d{2})\.jsonl/);
     return m != null && m[1] < cutoff;
@@ -25,14 +31,17 @@ export async function settleOldEvents(app: App, settings: MindTraceSettings): Pr
     if (!m) continue;
     const day = m[1];
     try {
-      const content = await adapter.read(f);
-      const events = parseEvents(content);
-      if (events.length === 0) {
-        await adapter.remove(f);
-        continue;
+      if (!settledDays.has(day)) {
+        // 尚未结算：聚合 + 写摘要
+        const content = await adapter.read(f);
+        const events = parseEvents(content);
+        if (events.length > 0) {
+          const summary = summarizeDay(day, events);
+          await appendSummary(adapter, dir, summary);
+          settledDays.add(day);
+        }
       }
-      const summary = summarizeDay(day, events);
-      await appendSummary(adapter, dir, summary);
+      // 已结算（或刚结算、或空文件）：删除原始文件
       await adapter.remove(f);
     } catch (e) {
       console.warn("MindTrace 结算失败，保留原始文件：", f, e);
