@@ -540,8 +540,10 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings,
     .slice(0, 10)
     .map(({ notePath, points }) => ({ notePath, points }));
 
-  // 14. 主题注意力流向（相邻 session 且间隔 < 5 分钟的切换）
-  const sorted = [...processed].sort((a, b) => a.session.ts - b.session.ts);
+  // 14. 主题注意力流向（相邻真实 session 且间隔 < 5 分钟的切换；虚拟摘要 session 不参与）
+  const sorted = [...processed]
+    .filter((p) => !isVirtual(p.session.notePath))
+    .sort((a, b) => a.session.ts - b.session.ts);
   const flowMap = new Map<string, number>();
   const GAP_THRESHOLD = 5 * 60 * 1000;
   for (let i = 1; i < sorted.length; i++) {

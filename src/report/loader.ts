@@ -40,6 +40,16 @@ export async function loadEvents(app: App, dataDir: string): Promise<TrackedEven
         // 文件刚被结算删除，跳过（ENOENT 竞态）
       }
     }
+    // summary 文件也纳入缓存键，summary 变化时缓存失效
+    for (const f of list.files) {
+      if (!f.includes("summary-")) continue;
+      try {
+        const st = await adapter.stat(f);
+        stamps.push({ path: f, mtime: st?.mtime ?? 0, size: st?.size ?? 0 });
+      } catch {
+        // 跳过
+      }
+    }
     if (cached && sameStamps(cached.stamps, stamps)) {
       return cached.events;
     }
