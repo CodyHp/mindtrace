@@ -18,6 +18,7 @@ export default class MindTracePlugin extends Plugin {
   private eventLog: EventLog | null = null;
   private sessionTracker: SessionTracker | null = null;
   private renderedBlocks = new Set<HTMLElement>();
+  private renderingBlocks = new Set<HTMLElement>();
   private pathExistsCache = new Map<string, boolean>();
   private refreshTimer: number | null = null;
   private lastEventsRef: TrackedEvent[] | null = null;
@@ -130,6 +131,8 @@ export default class MindTracePlugin extends Plugin {
   }
 
   async renderCodeBlock(el: HTMLElement): Promise<void> {
+    if (this.renderingBlocks.has(el)) return; // 防重入：同一块正在渲染，跳过本次触发
+    this.renderingBlocks.add(el);
     this.renderedBlocks.add(el);
     this.pathExistsCache.clear();
     const loading = el.createEl("div", { cls: "mindtrace-loading", text: t("loading") });
@@ -158,6 +161,8 @@ export default class MindTracePlugin extends Plugin {
       });
     } catch (e) {
       loading.textContent = t("loadFailed") + String(e);
+    } finally {
+      this.renderingBlocks.delete(el);
     }
   }
 
