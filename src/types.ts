@@ -1,5 +1,5 @@
 /** 会话结束原因 */
-export type SessionEndReason = "switch" | "close" | "idle" | "blur" | "shutdown";
+export type SessionEndReason = "switch" | "close" | "idle" | "blur" | "shutdown" | "live";
 
 /** 笔记编辑模式（对齐 Obsidian MarkdownView.getMode() 的返回值） */
 export type NoteMode = "source" | "preview";

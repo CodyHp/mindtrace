@@ -63,8 +63,9 @@ export default class MindTracePlugin extends Plugin {
         const view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (view?.file?.path !== this.settings.dashboardPath) return;
         if (this.refreshTimer !== null) return;
-        this.refreshTimer = window.setTimeout(() => {
+        this.refreshTimer = window.setTimeout(async () => {
           this.refreshTimer = null;
+          await this.eventLog?.flush(); // 先确保事件落盘，再刷新，避免「切走即看」读不到刚结束的 session
           void this.refreshAllBlocks();
         }, 300);
       }),
@@ -142,9 +143,14 @@ export default class MindTracePlugin extends Plugin {
       const filtered = events.filter(
         (ev) => ev.notePath !== this.settings.dashboardPath && this.pathExists(ev.notePath),
       );
-      // report 缓存：事件流引用未变（loadEvents 命中缓存）则复用上次报表
+      // report：合并「进行中」的 live session（实时活跃）；无 live 时用缓存
+      const live = this.sessionTracker?.getLiveSession();
+      const hasLive = live != null && live.notePath !== this.settings.dashboardPath;
       let report: Report;
-      if (this.lastEventsRef === events) {
+      if (hasLive) {
+        // 有进行中会话：每次重建（活跃实时变化），不更新缓存
+        report = buildReport([...filtered, live], this.settings);
+      } else if (this.lastEventsRef === events) {
         report = this.lastReport!;
       } else {
         report = buildReport(filtered, this.settings);

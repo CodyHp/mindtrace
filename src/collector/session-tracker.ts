@@ -2,7 +2,7 @@ import { App, MarkdownView, TFile } from "obsidian";
 import { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { EventLog } from "../storage/event-log";
-import { NoteMode, MindTraceSettings, SessionEndReason } from "../types";
+import { NoteMode, MindTraceSettings, SessionEndReason, SessionEvent } from "../types";
 import { countChars, countWords } from "../utils";
 
 interface ActiveSession {
@@ -166,6 +166,36 @@ export class SessionTracker {
     this.current.lastSettledTs = this.current.lastActiveTs;
   }
 
+  /**
+   * 返回当前「进行中」session 的实时快照（只读，不落盘、不修改内部状态）。
+   * 供报表层合并显示，让用户打开看板时能立刻看到正在进行的活跃时长。
+   */
+  getLiveSession(): SessionEvent | null {
+    if (!this.current) return null;
+    const sess = this.current;
+    const now = Date.now();
+    const liveSeg = Math.max(0, (now - sess.lastSettledTs) / 1000);
+    const activeSeconds = Math.round(sess.accumulatedSeconds + liveSeg);
+    if (activeSeconds < 1) return null;
+    const segments: [number, number][] = [...sess.segments];
+    if (liveSeg > 0) segments.push([sess.lastSettledTs, now]);
+    return {
+      type: "session",
+      ts: sess.startTs,
+      endTs: now,
+      notePath: sess.notePath,
+      noteTitle: sess.noteTitle,
+      mode: sess.mode,
+      activeSeconds,
+      endedBy: "live",
+      totalChars: sess.totalChars,
+      totalWords: sess.totalWords,
+      totalCharsEnd: sess.lastSampledChars >= 0 ? sess.lastSampledChars : sess.totalChars,
+      totalWordsEnd: sess.lastSampledWords >= 0 ? sess.lastSampledWords : sess.totalWords,
+      activeSegments: segments.length > 0 ? segments : undefined,
+    };
+  }
+
   private endSession(reason: SessionEndReason): void {
     if (!this.current) return;
     this.settle();
@@ -173,10 +203,30 @@ export class SessionTracker {
     this.current = null;
     const activeSeconds = Math.round(sess.accumulatedSeconds);
     if (activeSeconds < this.settings.minSessionSec) return;
+
+    // 立即落盘 session（totalCharsEnd 用最后采样近似），避免依赖异步文件读取导致切走时看板读不到
+    this.eventLog.append(
+      {
+        type: "session",
+        ts: sess.startTs,
+        endTs: Date.now(),
+        notePath: sess.notePath,
+        noteTitle: sess.noteTitle,
+        mode: sess.mode,
+        activeSeconds,
+        endedBy: reason,
+        totalChars: sess.totalChars,
+        totalWords: sess.totalWords,
+        totalCharsEnd: sess.lastSampledChars >= 0 ? sess.lastSampledChars : sess.totalChars,
+        totalWordsEnd: sess.lastSampledWords >= 0 ? sess.lastSampledWords : sess.totalWords,
+        activeSegments: sess.segments.length > 0 ? sess.segments : undefined,
+      },
+      true,
+    );
+
+    // 异步补：采样最终字数，落 edit 兜底（覆盖「写完就切走」尚未采样到的净增减）
     const file = this.app.vault.getAbstractFileByPath(sess.notePath);
     void this.sampleTotalCount(file instanceof TFile ? file : null).then(({ chars, words }) => {
-      // 兜底采样：session 内最后一次采样到结束的净增减（覆盖「写完就切走」场景）
-      // 基准未就绪（< 0）时跳过，避免把整篇文档字数误判为新增
       if (sess.lastSampledChars >= 0) {
         const charDelta = chars - sess.lastSampledChars;
         const wordDelta = words - sess.lastSampledWords;
@@ -195,24 +245,6 @@ export class SessionTracker {
           );
         }
       }
-      this.eventLog.append(
-        {
-          type: "session",
-          ts: sess.startTs,
-          endTs: Date.now(),
-          notePath: sess.notePath,
-          noteTitle: sess.noteTitle,
-          mode: sess.mode,
-          activeSeconds,
-          endedBy: reason,
-          totalChars: sess.totalChars,
-          totalWords: sess.totalWords,
-          totalCharsEnd: chars,
-          totalWordsEnd: words,
-          activeSegments: sess.segments.length > 0 ? sess.segments : undefined,
-        },
-        true,
-      );
     });
   }
 
