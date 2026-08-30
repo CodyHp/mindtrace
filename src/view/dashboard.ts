@@ -168,6 +168,13 @@ function ensureChartDiv(box: HTMLElement, cls = "mindtrace-chart"): HTMLElement 
   return box.createEl("div", { cls });
 }
 
+/** 清空卡片内容，但保留标题栏（h3，含导出按钮），避免重绘时标题消失 */
+function clearCard(box: HTMLElement): void {
+  const h3 = box.querySelector("h3");
+  box.empty();
+  if (h3) box.appendChild(h3);
+}
+
 /** 空态切换：空则显示提示并隐藏图表容器，非空反之（实例保留，避免销毁） */
 function setEmpty(box: HTMLElement, isEmpty: boolean): void {
   const chartDiv = box.querySelector<HTMLElement>(".mindtrace-chart");
@@ -435,7 +442,7 @@ function scheduleBlocks(el: HTMLElement, report: Report, theme: ThemeVars, openF
 }
 
 function renderKpis(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   const add = (label: string, value: string): void => {
     const k = box.createEl("div", { cls: "mindtrace-kpi" });
     k.createEl("div", { cls: "mindtrace-kpi-value", text: value });
@@ -448,7 +455,7 @@ function renderKpis(box: HTMLElement, report: Report): void {
 }
 
 function renderToday(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   const today = report.today;
 
   const summary = box.createEl("div", { cls: "mindtrace-today-summary" });
@@ -485,7 +492,7 @@ function withBaseline(text: string, value: number, avg: number, days: number): s
 }
 
 function renderInsights(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   const zh = getLocale() === "zh-CN";
 
   // 无任何今日数据时只显示空态引导
@@ -565,7 +572,7 @@ function renderInsights(box: HTMLElement, report: Report): void {
 
 // ---------- 数据质量（覆盖度进度条 / 追踪起始 / 排除异常） ----------
 function renderDataQuality(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   if (!report.trackedSince) {
     box.addClass("mindtrace-hidden");
     return;
@@ -853,7 +860,7 @@ function renderDocActivity(box: HTMLElement, report: Report, theme: ThemeVars): 
     { label: t("quarter"), data: report.docActivityQuarterly },
     { label: t("year"), data: report.docActivityYearly },
   ];
-  let currentMode = Number(box.dataset.mode ?? 2); // 默认月，跨数据更新保留用户选择
+  let currentMode = Number(box.dataset.mode ?? 0); // 默认天，跨数据更新保留用户选择
 
   let switcher = box.querySelector<HTMLElement>(".mindtrace-doc-growth-switcher");
   let buttons: HTMLElement[];
@@ -1168,7 +1175,7 @@ function rankingModes(): RankingMode[] {
 }
 
 function renderDocPerformance(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   if (report.docPerformance.length === 0) {
     box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
     return;
@@ -1224,7 +1231,7 @@ function renderDocPerformance(box: HTMLElement, report: Report): void {
 }
 
 function renderDocs(box: HTMLElement, report: Report, theme: ThemeVars, openFile?: (path: string) => void): void {
-  box.empty();
+  clearCard(box);
   const cols = box.createEl("div", { cls: "mindtrace-doc-cols" });
 
   const forgotBox = cols.createEl("div");
@@ -1273,7 +1280,7 @@ function modeLabel(mode: RevisitMode): string {
 }
 
 function renderTimeline(box: HTMLElement, report: Report): void {
-  box.empty();
+  clearCard(box);
   if (report.timeline.length === 0) {
     box.createEl("div", { cls: "mindtrace-empty", text: t("empty") });
     return;
