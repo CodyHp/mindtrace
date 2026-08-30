@@ -586,14 +586,6 @@ function renderDataQuality(box: HTMLElement, report: Report): void {
     text: t("coverageDetail", { active: report.activeDaysCount, total: report.trackedDays }),
   });
 
-  // 近 N 天覆盖度（短期完整性）
-  const recent = box.createEl("div", { cls: "mindtrace-dq-row" });
-  const recentHead = recent.createEl("div", { cls: "mindtrace-dq-head" });
-  recentHead.createEl("span", { cls: "mindtrace-dq-label", text: t("recentCoverage", { n: report.recentDays }) });
-  recentHead.createEl("span", { cls: "mindtrace-dq-value", text: `${report.recentCoverage}%` });
-  const recentBar = recent.createEl("div", { cls: "mindtrace-dq-bar" });
-  recentBar.createEl("div", { cls: "mindtrace-dq-fill", attr: { style: `width:${report.recentCoverage}%` } });
-
   // 追踪自
   const since = box.createEl("div", { cls: "mindtrace-dq-row" });
   since.createEl("span", { cls: "mindtrace-dq-label", text: t("trackedSince") });

@@ -195,10 +195,6 @@ export interface Report {
   activeDaysCount: number;
   /** 数据覆盖度 0-100（有数据天数 / 追踪总天数） */
   dataCoverage: number;
-  /** 近 retentionDays 天的覆盖度 0-100 */
-  recentCoverage: number;
-  /** 近期覆盖度的天数窗口（= retentionDays） */
-  recentDays: number;
   /** 被过滤的异常超长 session 数（含历史摘要里被过滤的） */
   excludedSessions: number;
 }
@@ -455,18 +451,11 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings,
   let trackedDays = 0;
   let dataCoverage = 0;
   if (trackedSince) {
-    const start = new Date(trackedSince).getTime();
+    const start = new Date(trackedSince + "T00:00:00").getTime(); // 本地时区解析，避免 UTC 偏差
     trackedDays = Math.floor((Date.now() - start) / 86400000) + 1;
-    dataCoverage = trackedDays > 0 ? Math.round((activeDays.size / trackedDays) * 100) : 100;
+    dataCoverage = trackedDays > 0 ? Math.min(100, Math.round((activeDays.size / trackedDays) * 100)) : 100;
   }
   const activeDaysCount = activeDays.size;
-
-  // 近 retentionDays 天的覆盖度（短期完整性）
-  const recentStart = new Date(todayStr + "T00:00:00");
-  recentStart.setDate(recentStart.getDate() - settings.retentionDays);
-  const recentCutoff = localDay(recentStart.getTime());
-  const recentActive = [...activeDays].filter((d) => d >= recentCutoff).length;
-  const recentCoverage = Math.round((recentActive / settings.retentionDays) * 100);
 
   // 11.5 每日活跃（日历热力图）
   const dailyMap = new Map<string, number>();
@@ -604,8 +593,6 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings,
     trackedDays,
     activeDaysCount,
     dataCoverage,
-    recentCoverage,
-    recentDays: settings.retentionDays,
     excludedSessions,
   };
 }
