@@ -133,7 +133,7 @@ const messages: Record<Locale, Record<string, string>> = {
     excludePaths: "排除路径",
     excludeDesc: "每行一个前缀，这些路径下的文件不记录。",
     retentionDays: "原始事件保留天数",
-    retentionDesc: "原始事件保留多少天（1-30），更早的会聚合成每日摘要后清理，避免数据无限增长。",
+    retentionDesc: "原始事件保留多少天（1-30）。更早的会聚合成每日摘要后清理；明细时间线、单篇字数增长等明细图只显示最近这些天。",
 
     exportImage: "导出图片",
     exportData: "导出数据",
@@ -286,7 +286,7 @@ const messages: Record<Locale, Record<string, string>> = {
     excludePaths: "Exclude paths",
     excludeDesc: "One prefix per line; files under these paths are not recorded.",
     retentionDays: "Retention days",
-    retentionDesc: "How many days to keep raw events (1-30); older days are summarized and cleaned up.",
+    retentionDesc: "How many days to keep raw events (1-30). Older days are summarized and cleaned up; detailed views (timeline, per-note growth) only cover these recent days.",
 
     exportImage: "Export image",
     exportData: "Export data",
