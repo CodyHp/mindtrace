@@ -7,7 +7,7 @@ import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
 import { loadSummaries, settleOldEvents } from "./storage/summarizer";
 import { Locale, setLocale, t } from "./i18n";
-import { MindTraceSettings, TrackedEvent } from "./types";
+import { MindTraceSettings, SUMMARY_PREFIX, TrackedEvent } from "./types";
 import { bumpRenderVersion, renderReport, setColorTheme as applyColorTheme, unmountReport } from "./view/dashboard";
 
 function dashboardTemplate(): string {
@@ -143,10 +143,12 @@ export default class MindTracePlugin extends Plugin {
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
       const summaries = await loadSummaries(this.app, this.settings.dataDir);
-      // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）与看板笔记自身
-      const filtered = events.filter(
-        (ev) => ev.notePath !== this.settings.dashboardPath && this.pathExists(ev.notePath),
-      );
+      // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）与看板笔记自身；
+      // 虚拟事件（从历史摘要反序列化）不检查文件存在
+      const filtered = events.filter((ev) => {
+        if (ev.notePath.startsWith(SUMMARY_PREFIX)) return true;
+        return ev.notePath !== this.settings.dashboardPath && this.pathExists(ev.notePath);
+      });
       // report：合并「进行中」的 live session（实时活跃）；无 live 时用缓存
       const live = this.sessionTracker?.getLiveSession();
       const hasLive = live != null && live.notePath !== this.settings.dashboardPath;
