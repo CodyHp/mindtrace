@@ -305,6 +305,17 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings,
     if (p.session.ts > cur.lastTs) cur.lastTs = p.session.ts;
     docMap.set(path, cur);
   }
+  // 合并历史摘要的文档级统计（docs 字段），补上历史文档表现/高频/遗忘
+  for (const sum of summaries) {
+    for (const [notePath, doc] of Object.entries(sum.docs)) {
+      const cur = docMap.get(notePath) ?? { count: 0, lastTs: 0, totalSeconds: 0, days: new Set() };
+      cur.count += doc.visits;
+      cur.totalSeconds += doc.seconds;
+      cur.days.add(sum.day);
+      docMap.set(notePath, cur);
+      editAddedByDoc.set(notePath, (editAddedByDoc.get(notePath) ?? 0) + doc.addedChars);
+    }
+  }
   const docs: DocFrequency[] = [...docMap.entries()].map(([notePath, v]) => ({
     notePath,
     count: v.count,
