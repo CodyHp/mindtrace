@@ -11,4 +11,5 @@ export const DEFAULT_SETTINGS: MindTraceSettings = {
   dashboardPath: "MindTrace.md",
   colorTheme: "theme",
   language: "zh-CN",
+  retentionDays: 7,
 };

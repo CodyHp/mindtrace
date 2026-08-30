@@ -44,6 +44,23 @@ export interface EditEvent {
 
 export type TrackedEvent = SessionEvent | EditEvent;
 
+/** 虚拟事件（从每日摘要反序列化）的 notePath 前缀，用于区分历史摘要与真实事件 */
+export const SUMMARY_PREFIX = "__summary__/";
+
+/** 每日摘要：把某天的事件聚合结果，用于历史归档（替代被清理的原始事件） */
+export interface DaySummary {
+  day: string;
+  activeSeconds: number;
+  readSeconds: number;
+  writeSeconds: number;
+  addedChars: number;
+  deletedChars: number;
+  /** "folder|hour" → 活跃秒数，用于重建时段×主题 / 活跃时段 / 主题排行 */
+  cells: Record<string, number>;
+  /** notePath → { visits, seconds, addedChars } */
+  docs: Record<string, { visits: number; seconds: number; addedChars: number }>;
+}
+
 /** 插件设置 */
 export interface MindTraceSettings {
   /** 数据目录（相对 vault 根） */
@@ -66,4 +83,6 @@ export interface MindTraceSettings {
   colorTheme: string;
   /** 界面语言：'auto' 跟随 Obsidian，'zh-CN'，或 'en' */
   language: string;
+  /** 原始事件保留天数（1-30），更早的聚合为每日摘要后清理 */
+  retentionDays: number;
 }

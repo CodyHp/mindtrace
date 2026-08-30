@@ -5,6 +5,7 @@ import { loadEvents } from "./report/loader";
 import { DEFAULT_SETTINGS } from "./settings";
 import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
+import { settleOldEvents } from "./storage/summarizer";
 import { Locale, setLocale, t } from "./i18n";
 import { MindTraceSettings, TrackedEvent } from "./types";
 import { bumpRenderVersion, renderReport, setColorTheme as applyColorTheme, unmountReport } from "./view/dashboard";
@@ -30,6 +31,8 @@ export default class MindTracePlugin extends Plugin {
     applyColorTheme(this.settings.colorTheme);
 
     this.eventLog = new EventLog(this.app, this.settings);
+    // 结算：把超过保留天数的原始事件聚合成每日摘要，控制数据量
+    void settleOldEvents(this.app, this.settings);
     this.sessionTracker = new SessionTracker(this.app, this.eventLog, this.settings);
     this.sessionTracker.start();
     this.registerEditorExtension(this.sessionTracker.editorExtension());

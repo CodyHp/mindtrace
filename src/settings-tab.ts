@@ -98,6 +98,11 @@ export class MindTraceSettingTab extends PluginSettingTab {
       await this.plugin.saveSettings();
     }, 0);
 
+    this.addNumber(containerEl, t("retentionDays"), t("retentionDesc"), this.plugin.settings.retentionDays, async (n) => {
+      this.plugin.settings.retentionDays = Math.min(30, Math.max(1, n));
+      await this.plugin.saveSettings();
+    }, 1, 30);
+
     new Setting(containerEl)
       .setName(t("excludePaths"))
       .setDesc(t("excludeDesc"))
@@ -124,6 +129,7 @@ export class MindTraceSettingTab extends PluginSettingTab {
     value: number,
     onSave: (n: number) => Promise<void>,
     min = 1,
+    max?: number,
   ): void {
     new Setting(containerEl)
       .setName(name)
@@ -131,7 +137,7 @@ export class MindTraceSettingTab extends PluginSettingTab {
       .addText((text) =>
         text.setValue(String(value)).onChange(async (input) => {
           const n = Number(input);
-          if (Number.isFinite(n) && n >= min) {
+          if (Number.isFinite(n) && n >= min && (max === undefined || n <= max)) {
             await onSave(Math.floor(n));
           }
         }),

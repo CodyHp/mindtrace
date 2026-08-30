@@ -1,10 +1,15 @@
-import { EditEvent, MindTraceSettings, SessionEvent, TrackedEvent } from "../types";
+import { EditEvent, MindTraceSettings, SessionEvent, SUMMARY_PREFIX, TrackedEvent } from "../types";
 import { UNCATEGORIZED, folderLevels } from "./classify";
 import { classifyReadWrite } from "./readwrite";
 import { localDay, localHour } from "../utils";
 
 /** 单个 session 活跃时长上限（秒），超过视为挂机污染，不计入报表 */
 const MAX_SESSION_SEC = 4 * 3600;
+
+/** 是否从每日摘要反序列化的虚拟事件（历史归档） */
+function isVirtual(path: string): boolean {
+  return path.startsWith(SUMMARY_PREFIX);
+}
 
 export interface ProcessedSession {
   session: SessionEvent;
@@ -209,7 +214,9 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     const deleted = Math.max(0, -e.charDelta);
     editAddedByDay.set(day, (editAddedByDay.get(day) ?? 0) + added);
     editDeletedByDay.set(day, (editDeletedByDay.get(day) ?? 0) + deleted);
-    editAddedByDoc.set(e.notePath, (editAddedByDoc.get(e.notePath) ?? 0) + added);
+    if (!isVirtual(e.notePath)) {
+      editAddedByDoc.set(e.notePath, (editAddedByDoc.get(e.notePath) ?? 0) + added);
+    }
   }
 
   const processed: ProcessedSession[] = [];
@@ -219,7 +226,8 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
       excludedSessions += 1; // 过滤挂机污染的超长会话
       continue;
     }
-    const levels = folderLevels(s.notePath);
+    const realPath = isVirtual(s.notePath) ? s.notePath.slice(SUMMARY_PREFIX.length) : s.notePath;
+    const levels = folderLevels(realPath);
     const folders = levels.length > 0 ? levels : [UNCATEGORIZED];
     const top = levels.length > 0 ? levels[0] : UNCATEGORIZED;
     const { readSeconds, writeSeconds } = classifyReadWrite(s);
@@ -285,6 +293,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   const docMap = new Map<string, { count: number; lastTs: number; totalSeconds: number; days: Set<string> }>();
   for (const p of processed) {
     const path = p.session.notePath;
+    if (isVirtual(path)) continue; // 虚拟 session 不进文档统计
     const cur = docMap.get(path) ?? { count: 0, lastTs: 0, totalSeconds: 0, days: new Set() };
     cur.count += 1;
     cur.totalSeconds += p.readSeconds + p.writeSeconds;
@@ -338,6 +347,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
 
   // 7. 明细时间线
   const timeline: TimelineItem[] = processed
+    .filter((p) => !isVirtual(p.session.notePath))
     .map((p) => ({
       ts: p.session.ts,
       notePath: p.session.notePath,
@@ -470,9 +480,11 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   };
 
   // 11.6 文档活跃度（周/月/年三种粒度的去重篇数）
-  const activeDocEvents = processed.map((p) => ({ ts: p.session.ts, notePath: p.session.notePath }));
+  const activeDocEvents = processed
+    .filter((p) => !isVirtual(p.session.notePath))
+    .map((p) => ({ ts: p.session.ts, notePath: p.session.notePath }));
   const writeDocEvents = edits
-    .filter((e) => e.charDelta > 0)
+    .filter((e) => e.charDelta > 0 && !isVirtual(e.notePath))
     .map((e) => ({ ts: e.ts, notePath: e.notePath }));
   const docActivityDaily = buildDocActivity(activeDocEvents, writeDocEvents, localDay);
   const docActivityWeekly = buildDocActivity(activeDocEvents, writeDocEvents, weekKey);
@@ -507,6 +519,7 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   // 13. 单篇字数增长（按累计净增长排序，显示增长最多的文档，而非高频文档）
   const growthMap = new Map<string, { ts: number; cumulative: number }[]>();
   for (const e of edits) {
+    if (isVirtual(e.notePath)) continue; // 虚拟 edit 不进单篇增长
     const list = growthMap.get(e.notePath) ?? [];
     const prev = list.length > 0 ? list[list.length - 1].cumulative : 0;
     list.push({ ts: e.ts, cumulative: prev + e.charDelta });

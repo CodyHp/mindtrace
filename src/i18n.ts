@@ -132,6 +132,8 @@ const messages: Record<Locale, Record<string, string>> = {
     writeDesc: "一个分片内净增字符数达到该值即判为「写作」，否则「阅读」。0 表示任何编辑即写作。",
     excludePaths: "排除路径",
     excludeDesc: "每行一个前缀，这些路径下的文件不记录。",
+    retentionDays: "原始事件保留天数",
+    retentionDesc: "原始事件保留多少天（1-30），更早的会聚合成每日摘要后清理，避免数据无限增长。",
 
     exportImage: "导出图片",
     exportData: "导出数据",
@@ -283,6 +285,8 @@ const messages: Record<Locale, Record<string, string>> = {
     writeDesc: "Net chars in one slice reaching this value counts as \"writing\". 0 means any edit is writing.",
     excludePaths: "Exclude paths",
     excludeDesc: "One prefix per line; files under these paths are not recorded.",
+    retentionDays: "Retention days",
+    retentionDesc: "How many days to keep raw events (1-30); older days are summarized and cleaned up.",
 
     exportImage: "Export image",
     exportData: "Export data",
