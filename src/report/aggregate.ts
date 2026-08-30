@@ -1,4 +1,4 @@
-import { EditEvent, MindTraceSettings, SessionEvent, SUMMARY_PREFIX, TrackedEvent } from "../types";
+import { DaySummary, EditEvent, MindTraceSettings, SessionEvent, SUMMARY_PREFIX, TrackedEvent } from "../types";
 import { UNCATEGORIZED, folderLevels } from "./classify";
 import { classifyReadWrite } from "./readwrite";
 import { localDay, localHour } from "../utils";
@@ -195,12 +195,16 @@ export interface Report {
   activeDaysCount: number;
   /** 数据覆盖度 0-100（有数据天数 / 追踪总天数） */
   dataCoverage: number;
-  /** 被过滤的异常超长 session 数 */
+  /** 近 retentionDays 天的覆盖度 0-100 */
+  recentCoverage: number;
+  /** 近期覆盖度的天数窗口（= retentionDays） */
+  recentDays: number;
+  /** 被过滤的异常超长 session 数（含历史摘要里被过滤的） */
   excludedSessions: number;
 }
 
-/** 从原始事件流构建完整报表数据 */
-export function buildReport(events: TrackedEvent[], settings: MindTraceSettings): Report {
+/** 从原始事件流构建完整报表数据；summaries 为历史每日摘要（可选，用于累计被过滤的异常会话） */
+export function buildReport(events: TrackedEvent[], settings: MindTraceSettings, summaries: DaySummary[] = []): Report {
   const sessions = events.filter((e): e is SessionEvent => e.type === "session");
   const edits = events.filter((e): e is EditEvent => e.type === "edit").sort((a, b) => a.ts - b.ts);
 
@@ -232,6 +236,10 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     const top = levels.length > 0 ? levels[0] : UNCATEGORIZED;
     const { readSeconds, writeSeconds } = classifyReadWrite(s);
     processed.push({ session: s, folders, top, readSeconds, writeSeconds });
+  }
+  // 加上历史摘要里被过滤的异常会话（聚合时已排除）
+  for (const sum of summaries) {
+    excludedSessions += sum.excludedSessions ?? 0;
   }
 
   // 1. 时段 × 主题矩阵
@@ -453,6 +461,13 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
   }
   const activeDaysCount = activeDays.size;
 
+  // 近 retentionDays 天的覆盖度（短期完整性）
+  const recentStart = new Date(todayStr + "T00:00:00");
+  recentStart.setDate(recentStart.getDate() - settings.retentionDays);
+  const recentCutoff = localDay(recentStart.getTime());
+  const recentActive = [...activeDays].filter((d) => d >= recentCutoff).length;
+  const recentCoverage = Math.round((recentActive / settings.retentionDays) * 100);
+
   // 11.5 每日活跃（日历热力图）
   const dailyMap = new Map<string, number>();
   for (const p of processed) {
@@ -589,6 +604,8 @@ export function buildReport(events: TrackedEvent[], settings: MindTraceSettings)
     trackedDays,
     activeDaysCount,
     dataCoverage,
+    recentCoverage,
+    recentDays: settings.retentionDays,
     excludedSessions,
   };
 }

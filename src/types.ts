@@ -55,6 +55,8 @@ export interface DaySummary {
   writeSeconds: number;
   addedChars: number;
   deletedChars: number;
+  /** 当天被过滤的异常超长 session 数（聚合时排除） */
+  excludedSessions: number;
   /** "folder|hour" → 活跃秒数，用于重建时段×主题 / 活跃时段 / 主题排行 */
   cells: Record<string, number>;
   /** notePath → { visits, seconds, addedChars } */

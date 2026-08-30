@@ -5,7 +5,7 @@ import { loadEvents } from "./report/loader";
 import { DEFAULT_SETTINGS } from "./settings";
 import { MindTraceSettingTab } from "./settings-tab";
 import { EventLog } from "./storage/event-log";
-import { settleOldEvents } from "./storage/summarizer";
+import { loadSummaries, settleOldEvents } from "./storage/summarizer";
 import { Locale, setLocale, t } from "./i18n";
 import { MindTraceSettings, TrackedEvent } from "./types";
 import { bumpRenderVersion, renderReport, setColorTheme as applyColorTheme, unmountReport } from "./view/dashboard";
@@ -142,6 +142,7 @@ export default class MindTracePlugin extends Plugin {
     const loading = el.createEl("div", { cls: "mindtrace-loading", text: t("loading") });
     try {
       const events = await loadEvents(this.app, this.settings.dataDir);
+      const summaries = await loadSummaries(this.app, this.settings.dataDir);
       // 过滤已不存在的 notePath（旧命名残留的临时文件，如「未命名.md」）与看板笔记自身
       const filtered = events.filter(
         (ev) => ev.notePath !== this.settings.dashboardPath && this.pathExists(ev.notePath),
@@ -152,11 +153,11 @@ export default class MindTracePlugin extends Plugin {
       let report: Report;
       if (hasLive) {
         // 有进行中会话：每次重建（活跃实时变化），不更新缓存
-        report = buildReport([...filtered, live], this.settings);
+        report = buildReport([...filtered, live], this.settings, summaries);
       } else if (this.lastEventsRef === events) {
         report = this.lastReport!;
       } else {
-        report = buildReport(filtered, this.settings);
+        report = buildReport(filtered, this.settings, summaries);
         this.lastEventsRef = events;
         this.lastReport = report;
       }

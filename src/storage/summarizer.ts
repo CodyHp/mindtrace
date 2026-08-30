@@ -103,9 +103,13 @@ export function summarizeDay(day: string, events: TrackedEvent[]): DaySummary {
   let writeSeconds = 0;
   let addedChars = 0;
   let deletedChars = 0;
+  let excludedSessions = 0;
 
   for (const s of sessions) {
-    if (s.activeSeconds > MAX_SESSION_SEC) continue;
+    if (s.activeSeconds > MAX_SESSION_SEC) {
+      excludedSessions += 1; // 记录被过滤的异常超长会话
+      continue;
+    }
     const { readSeconds: r, writeSeconds: w } = classifyReadWrite(s);
     activeSeconds += s.activeSeconds;
     readSeconds += r;
@@ -128,7 +132,7 @@ export function summarizeDay(day: string, events: TrackedEvent[]): DaySummary {
     const doc = docs[e.notePath];
     if (doc) doc.addedChars += added;
   }
-  return { day, activeSeconds, readSeconds, writeSeconds, addedChars, deletedChars, cells, docs };
+  return { day, activeSeconds, readSeconds, writeSeconds, addedChars, deletedChars, excludedSessions, cells, docs };
 }
 
 function sessionHourSplit(session: SessionEvent): Map<number, number> {
