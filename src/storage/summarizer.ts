@@ -3,6 +3,7 @@ import { DaySummary, EditEvent, MindTraceSettings, SessionEvent, TrackedEvent } 
 import { localDay, localHour } from "../utils";
 import { classifyReadWrite } from "../report/readwrite";
 import { folderLevels, UNCATEGORIZED } from "../report/classify";
+import { getDeviceId } from "./device";
 
 const MAX_SESSION_SEC = 4 * 3600;
 
@@ -22,12 +23,15 @@ export async function settleOldEvents(app: App, settings: MindTraceSettings): Pr
   const existingSummaries = await loadSummaries(app, settings.dataDir);
   for (const s of existingSummaries) settledDays.add(s.day);
 
+  // 只结算「本设备」的过期事件文件（其它设备由它们各自结算）
+  const deviceId = getDeviceId();
+  const re = new RegExp(`events-${deviceId}-(\\d{4}-\\d{2}-\\d{2})\\.jsonl$`);
   const expired = list.files.filter((f) => {
-    const m = f.match(/events-(\d{4}-\d{2}-\d{2})\.jsonl/);
+    const m = f.match(re);
     return m != null && m[1] < cutoff;
   });
   for (const f of expired) {
-    const m = f.match(/events-(\d{4}-\d{2}-\d{2})\.jsonl/);
+    const m = f.match(re);
     if (!m) continue;
     const day = m[1];
     try {
@@ -158,7 +162,8 @@ function sessionHourSplit(session: SessionEvent): Map<number, number> {
 
 async function appendSummary(adapter: App["vault"]["adapter"], dir: string, summary: DaySummary): Promise<void> {
   const month = summary.day.slice(0, 7);
-  const path = normalizePath(`${dir}/summary-${month}.jsonl`);
+  const deviceId = getDeviceId();
+  const path = normalizePath(`${dir}/summary-${deviceId}-${month}.jsonl`);
   const line = JSON.stringify(summary) + "\n";
   if (await adapter.exists(path)) {
     await adapter.append(path, line);

@@ -1,9 +1,11 @@
 import { App, normalizePath } from "obsidian";
 import { MindTraceSettings, TrackedEvent } from "../types";
 import { localDay } from "../utils";
+import { getDeviceId } from "./device";
 
 /**
  * append-only JSONL 事件日志。
+ * 文件按「设备 + 日期」分（events-{deviceId}-{date}.jsonl），多设备各写各的，避免 Sync 冲突。
  * edit 事件走 1s 微缓冲；session 事件 immediate 落盘，避免退出丢数据。
  * 写盘失败会回滚 buffer，不静默丢数据。
  */
@@ -11,8 +13,11 @@ export class EventLog {
   private buffer: TrackedEvent[] = [];
   private flushTimer: number | null = null;
   private flushPromise: Promise<void> | null = null;
+  private readonly deviceId: string;
 
-  constructor(private app: App, private settings: MindTraceSettings) {}
+  constructor(private app: App, private settings: MindTraceSettings) {
+    this.deviceId = getDeviceId();
+  }
 
   append(ev: TrackedEvent, immediate = false): void {
     this.buffer.push(ev);
@@ -56,7 +61,7 @@ export class EventLog {
         await this.app.vault.adapter.mkdir(dir);
       }
       for (const [day, list] of byDay) {
-        const path = normalizePath(`${this.settings.dataDir}/events-${day}.jsonl`);
+        const path = normalizePath(`${this.settings.dataDir}/events-${this.deviceId}-${day}.jsonl`);
         const lines = list.map((e) => JSON.stringify(e)).join("\n") + "\n";
         // 首日文件不存在时 append 可能失败，改用 write
         if (await this.app.vault.adapter.exists(path)) {
