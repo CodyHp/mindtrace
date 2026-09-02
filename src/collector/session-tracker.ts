@@ -196,6 +196,21 @@ export class SessionTracker {
     };
   }
 
+  /** 文件/文件夹重命名时，同步更新当前 session 的 notePath，避免后续采样读旧路径而丢数据 */
+  onRename(oldPath: string, newPath: string): void {
+    if (!this.current) return;
+    const cur = this.current;
+    if (cur.notePath === oldPath) {
+      cur.notePath = newPath;
+      const parts = newPath.split("/");
+      const base = parts[parts.length - 1] ?? newPath;
+      const dot = base.lastIndexOf(".");
+      cur.noteTitle = dot > 0 ? base.slice(0, dot) : base;
+    } else if (cur.notePath.startsWith(oldPath + "/")) {
+      cur.notePath = newPath + cur.notePath.slice(oldPath.length);
+    }
+  }
+
   private endSession(reason: SessionEndReason): void {
     if (!this.current) return;
     this.settle();

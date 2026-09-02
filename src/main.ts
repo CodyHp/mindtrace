@@ -37,10 +37,12 @@ export default class MindTracePlugin extends Plugin {
     this.sessionTracker.start();
     this.registerEditorExtension(this.sessionTracker.editorExtension());
 
-    // 文件/文件夹重命名后，同步历史记录路径，避免看板指向不存在的文件
+    // 文件/文件夹重命名后：同步当前 session 路径 + 迁移历史记录，避免看板指向不存在的文件
     this.registerEvent(
       this.app.vault.on("rename", (file, oldPath) => {
-        void this.eventLog?.renamePath(oldPath, file.path);
+        this.sessionTracker?.onRename(oldPath, file.path);
+        // 先 flush 确保已落盘事件被迁移，再更新历史文件路径
+        void this.eventLog?.flush().then(() => this.eventLog?.renamePath(oldPath, file.path));
       }),
     );
 
